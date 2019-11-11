@@ -8,4 +8,5 @@ Robot-Parallel-Motion-Planning
 * Klayton Wittler: [LinkedIn](https://www.linkedin.com/in/klayton-wittler)
 
 ## Milestones:
-* 
+
+* [Pitch](files/CIS%20565%20Final%20Project%20Final%20project%20Pitch.pdf)
