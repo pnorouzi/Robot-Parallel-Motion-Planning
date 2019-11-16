@@ -69,7 +69,7 @@ class BasicAgent(Agent):
 
         # Setting up global router
         if self._grp is None:
-            dao = GlobalRoutePlannerDAO(self._vehicle.get_world().get_map(), self.  )
+            dao = GlobalRoutePlannerDAO(self._vehicle.get_world().get_map(), self._hop_resolution)
             grp = GlobalRoutePlanner(dao)
             grp.setup()
             self._grp = grp
