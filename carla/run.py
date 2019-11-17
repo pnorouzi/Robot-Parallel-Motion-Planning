@@ -30,8 +30,8 @@ from agents.navigation.basic_agent import BasicAgent
 from cuda_agent import *
 from environment import *
 
-DEBUG = True
-NUM_OBSTACLES = 0
+DEBUG = False
+NUM_OBSTACLES = 50
 SPAWN_POINT_INDICES = [116,198,116]
 AGENT = 'basic'
 
@@ -42,7 +42,7 @@ def game_loop(options_dict):
     try:
         # load the client and change the world
         client = carla.Client('localhost', 2000)
-        client.set_timeout(5.0)
+        client.set_timeout(60.0)
 
         print('Changing world to Town 5')
         client.load_world('Town05') 
@@ -66,12 +66,12 @@ def game_loop(options_dict):
         print('Going to ', destination_point)
         agent.set_destination((destination_point.x, destination_point.y, destination_point.z))
         
-        camera_bp = ['sensor.camera.rgb', 'sensor.camera.rgb', 'sensor.lidar.ray_cast']
-        camera_transform = [carla.Transform(carla.Location(x=1.5, z=2.4), carla.Rotation(pitch=-15, yaw=40)), carla.Transform(carla.Location(x=1.5, z=2.4), carla.Rotation(pitch=-15, yaw=-40)), carla.Transform(carla.Location(x=1.5, z=2.4))]
+        camera_bp = ['sensor.camera.rgb', "sensor.camera.semantic_segmentation", "sensor.camera.depth"]
+        camera_transform = carla.Transform(carla.Location(x= 2.5,z=2))
 
-        cam1 = Camera(camera_bp[0], camera_transform[0], vehicle, agent)
-        cam2 = Camera(camera_bp[1], camera_transform[1], vehicle, agent)
-        lidar = Lidar(camera_bp[2], camera_transform[2], vehicle, agent)
+        #camera = Camera(camera_bp[0], camera_transform, vehicle, agent)
+        segment= Camera(camera_bp[1], camera_transform, vehicle, agent)
+        depth = Camera(camera_bp[2], camera_transform, vehicle, agent)
 
         world.create_obstacles(options_dict['num_obstacles'])
 
@@ -79,7 +79,7 @@ def game_loop(options_dict):
 
         sp = 2
         while True:
-            world_snapshot = world.world.wait_for_tick(10.0)
+            world_snapshot = world.world.wait_for_tick(60.0)
 
             if not world_snapshot:
                 continue
@@ -113,7 +113,8 @@ if __name__ == '__main__':
     sensor_dict = {
         'IM_WIDTH': 400,
         'IM_HEIGHT': 300,
-        'SENSOR_TICK': 0.2
+        'SENSOR_TICK': 0.0,
+        'FOV': 120
     }
     sensor_attributes(sensor_dict)
 
