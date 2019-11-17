@@ -39,11 +39,27 @@ class World(object):
         self.blueprint_library = self.world.get_blueprint_library()
         self.actor_list = []
 
+    def create_obstacles(self, num_obstacles):
+        obstacles = 0
+        while obstacles < num_obstacles:
+            transform = random.choice(self.world.get_map().get_spawn_points())
+            transform.rotation.yaw = random.randrange(-180.0, 180.0, 1.0)
+
+            bp = random.choice(self.blueprint_library.filter('vehicle'))
+
+            # This time we are using try_spawn_actor. If the spot is already
+            # occupied by another object, the function will return None.
+            npc = self.world.try_spawn_actor(bp, transform)
+            if npc is not None:
+                self.actor_list.append(npc)
+                obstacles += 1
+                # print('obstacle created %s' % npc.type_id)            
+
     def destroy(self):
         print('destroying actors')
         for actor in self.actor_list:
             actor.destroy()
-        print('done.')
+        print('actors destroyed')
 
 class Car(object):
     def __init__(self, vehicle_bp, transform, carla_world):
@@ -93,7 +109,7 @@ class Lidar(object):
         self.world.actor_list.append(self.sensor)
 
         weak_self = weakref.ref(self)
-        # self.sensor.listen(lambda image: Lidar.callback(weak_self,image))
+        self.sensor.listen(lambda image: Lidar.callback(weak_self,image))
 
     @staticmethod
     def callback(weak_self, data):

@@ -36,27 +36,25 @@ def game_loop():
     try:
         client = carla.Client('localhost', 2000)
         client.set_timeout(5.0)
-        if client.get_world() != 1230765172743732701:
-            client.load_world('Town05') 
+
+        print('Changing world to Town 5')
+        client.load_world('Town05') 
 
         world = World(client.get_world())
 
-        # settings = world.world.get_settings()
-        # settings.fixed_delta_seconds = 0.2
-        # settings.synchronous_mode = True
-        # world.world.apply_settings(settings)
-
+        spawn_points = world.world.get_map().get_spawn_points()
 
         vehicle_bp = 'model3'
-        vehicle_transform = carla.Transform(carla.Location(x=46.1, y=-5.6, z=0.5), carla.Rotation(yaw=-177))
+        vehicle_transform = spawn_points[116]
         
         vehicle = Car(vehicle_bp, vehicle_transform, world)
 
         agent = agent = BasicAgent(vehicle.vehicle)
         
-        spawn_point = carla.Transform(carla.Location(x=-127.8, y=68.9, z=0.5), carla.Rotation(yaw=90))
-        print(spawn_point)
-        agent.set_destination((spawn_point.location.x, spawn_point.location.y, spawn_point.location.z))
+        destination_point = spawn_points[198].location
+
+        print('Going to ', destination_point)
+        agent.set_destination((destination_point.x, destination_point.y, destination_point.z))
         
         camera_bp = ['sensor.camera.rgb', 'sensor.camera.rgb', 'sensor.lidar.ray_cast']
         camera_transform = [carla.Transform(carla.Location(x=1.5, z=2.4), carla.Rotation(pitch=-15, yaw=40)), carla.Transform(carla.Location(x=1.5, z=2.4), carla.Rotation(pitch=-15, yaw=-40)), carla.Transform(carla.Location(x=1.5, z=2.4))]
@@ -65,6 +63,10 @@ def game_loop():
         cam2 = Camera(camera_bp[1], camera_transform[1], vehicle)
         lidar = Lidar(camera_bp[2], camera_transform[2], vehicle)
 
+        world.create_obstacles(50)
+
+        prev_location = vehicle.vehicle.get_location()
+
         while True:
             world_snapshot = world.world.wait_for_tick(10.0)
 
@@ -72,11 +74,16 @@ def game_loop():
                 continue
 
             control = agent.run_step()
-           
-            control.manual_gear_shift = False
             vehicle.vehicle.apply_control(control)
 
             world.world.tick()
+
+            current_location = vehicle.vehicle.get_location()
+
+            if current_location.distance(prev_location) <= 0.0 and current_location.distance(destination_point) <= 10:
+                print('distance from destination: ', current_location.distance(destination_point))
+                break
+            prev_location = current_location
 
 
     finally:
