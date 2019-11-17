@@ -3,7 +3,7 @@ import numpy as np
 import networkx as nx
 
 import carla
-from agents.navigation.agent import Agent, AgentState
+# from agents.navigation.agent import Agent, AgentState
 from agents.tools.misc import draw_waypoints
 from agents.tools.misc import get_speed
 
