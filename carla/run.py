@@ -31,8 +31,8 @@ from cuda_agent import *
 from environment import *
 
 DEBUG = True
-NUM_OBSTACLES = 20
-SPAWN_POINT_INDICES = [116,198]
+NUM_OBSTACLES = 0
+SPAWN_POINT_INDICES = [116,198,116]
 AGENT = 'basic'
 
 
@@ -77,6 +77,7 @@ def game_loop(options_dict):
 
         prev_location = vehicle.vehicle.get_location()
 
+        sp = 2
         while True:
             world_snapshot = world.world.wait_for_tick(10.0)
 
@@ -92,7 +93,14 @@ def game_loop(options_dict):
 
             if current_location.distance(prev_location) <= 0.0 and current_location.distance(destination_point) <= 10:
                 print('distance from destination: ', current_location.distance(destination_point))
-                break
+                if len(options_dict['spawn_point_indices']) <= sp:
+                    break
+                else:
+                    destination_point = spawn_points[options_dict['spawn_point_indices'][sp]].location
+                    print('Going to ', destination_point)
+                    agent.set_destination((destination_point.x, destination_point.y, destination_point.z))
+                    sp += 1
+
             prev_location = current_location
 
 

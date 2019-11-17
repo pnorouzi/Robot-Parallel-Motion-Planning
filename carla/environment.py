@@ -100,7 +100,7 @@ class Camera(object):
         if not self:
             return
         ## TODO ##
-        # pass in agent to update location and velocity as well as obstacle list #
+        # update locatoin, velocity, and obstacle list in agent #
 
 
 class Lidar(object):
@@ -126,7 +126,7 @@ class Lidar(object):
         if not self:
             return
         ## TODO ##
-        # pass in agent to update location and velocity as well as obstacle list #
+        # update locatoin, velocity, and obstacle list in agent #
 
 
 def test():

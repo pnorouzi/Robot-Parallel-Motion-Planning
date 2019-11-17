@@ -22,8 +22,10 @@ class CudaAgent(object):
         self._proximity_threshold = 10.0  # meters
         self._world = self._vehicle.get_world()
         self._map = self._vehicle.get_world().get_map()
+
         self.vehicle_transform = self._vehicle.get_transform()
         self.current_speed = get_speed(self._vehicle)
+        self.obstacle_list = []
 
         self._dt = 1.0 / 20.0
         args_lateral_dict = {
@@ -46,6 +48,7 @@ class CudaAgent(object):
     def _trace_route(self):
         ## TODO ## 
         # obstacle detection #
+        # path planning #
 
         # obstacle_list = [] # detection
         # gmt(self._vehicle.get_location(), self.end_waypoint, obstacle_list)
