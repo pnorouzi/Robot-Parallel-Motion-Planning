@@ -186,7 +186,7 @@ class LocalPlanner(object):
         self._target_road_option = RoadOption.LANEFOLLOW
         self._global_plan = True
 
-    def run_step(self, debug=True):
+    def run_step(self, debug=False):
         """
         Execute one step of local planning which involves running the longitudinal and lateral PID controllers to
         follow the waypoints trajectory.
@@ -237,8 +237,8 @@ class LocalPlanner(object):
             for i in range(max_index + 1):
                 self._waypoint_buffer.popleft()
 
-        # if debug:
-        #     draw_waypoints(self._vehicle.get_world(), [self.target_waypoint], self._vehicle.get_location().z + 1.0)
+        if debug:
+            draw_waypoints(self._vehicle.get_world(), [self.target_waypoint], self._vehicle.get_location().z + 1.0)
 
         return control
 

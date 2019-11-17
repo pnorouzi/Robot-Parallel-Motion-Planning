@@ -18,19 +18,22 @@ try:
 except IndexError:
     pass
 
-import carla
-from agents.navigation.roaming_agent import RoamingAgent
-from agents.navigation.basic_agent import BasicAgent
-
 import random
 import time
 import threading
-
 import weakref
+
+import carla
 
 IM_WIDTH = 400
 IM_HEIGHT = 300
 SENSOR_TICK = 0.2
+
+def sensor_attributes(options_dict):
+    IM_WIDTH = options_dict['IM_WIDTH']
+    IM_HEIGHT = options_dict['IM_HEIGHT']
+    SENSOR_TICK = options_dict['SENSOR_TICK']
+
 
 class World(object):
     def __init__(self, carla_world):
@@ -61,6 +64,7 @@ class World(object):
             actor.destroy()
         print('actors destroyed')
 
+
 class Car(object):
     def __init__(self, vehicle_bp, transform, carla_world):
         self.world = carla_world
@@ -70,11 +74,13 @@ class Car(object):
         self.vehicle = self.world.world.spawn_actor(bp, self.vehicle_transform)
         self.world.actor_list.append(self.vehicle)
 
+
 class Camera(object):
-    def __init__(self, sensor_bp, transform, parent_actor):
+    def __init__(self, sensor_bp, transform, parent_actor, agent):
         self.vehicle = parent_actor
         self.camera_transform = transform
         self.world = self.vehicle.world
+        self.agent = agent
 
         bp = self.world.blueprint_library.find(sensor_bp)
         bp.set_attribute('image_size_x', f'{IM_WIDTH}')
@@ -93,13 +99,16 @@ class Camera(object):
         self = weak_self()
         if not self:
             return
-        # data.save_to_disk('_out/%08d_%i' % (data.frame_number, self.sensor.id))
+        ## TODO ##
+        # pass in agent to update location and velocity as well as obstacle list #
+
 
 class Lidar(object):
-    def __init__(self, sensor_bp, transform, parent_actor):
+    def __init__(self, sensor_bp, transform, parent_actor, agent):
         self.vehicle = parent_actor
         self.camera_transform = transform
         self.world = self.vehicle.world
+        self.agent = agent
 
         bp = self.world.blueprint_library.find(sensor_bp)
         bp.set_attribute('sensor_tick', f'{SENSOR_TICK}')
@@ -116,9 +125,11 @@ class Lidar(object):
         self = weak_self()
         if not self:
             return
-        # data.save_to_disk('_out/%08d_%i' % (data.frame_number, self.sensor.id))
+        ## TODO ##
+        # pass in agent to update location and velocity as well as obstacle list #
 
-def main():
+
+def test():
     world = None
 
     try:
@@ -150,4 +161,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    test()
