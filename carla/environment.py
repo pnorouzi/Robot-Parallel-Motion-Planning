@@ -18,19 +18,22 @@ try:
 except IndexError:
     pass
 
-import carla
-from agents.navigation.roaming_agent import RoamingAgent
-from agents.navigation.basic_agent import BasicAgent
-
 import random
 import time
 import threading
-
 import weakref
+
+import carla
 
 IM_WIDTH = 400
 IM_HEIGHT = 300
 SENSOR_TICK = 0.2
+
+def sensor_attributes(options_dict):
+    IM_WIDTH = options_dict['IM_WIDTH']
+    IM_HEIGHT = options_dict['IM_HEIGHT']
+    SENSOR_TICK = options_dict['SENSOR_TICK']
+
 
 class World(object):
     def __init__(self, carla_world):
@@ -39,11 +42,28 @@ class World(object):
         self.blueprint_library = self.world.get_blueprint_library()
         self.actor_list = []
 
+    def create_obstacles(self, num_obstacles):
+        obstacles = 0
+        while obstacles < num_obstacles:
+            transform = random.choice(self.world.get_map().get_spawn_points())
+            transform.rotation.yaw = random.randrange(-180.0, 180.0, 1.0)
+
+            bp = random.choice(self.blueprint_library.filter('vehicle'))
+
+            # This time we are using try_spawn_actor. If the spot is already
+            # occupied by another object, the function will return None.
+            npc = self.world.try_spawn_actor(bp, transform)
+            if npc is not None:
+                self.actor_list.append(npc)
+                obstacles += 1
+                # print('obstacle created %s' % npc.type_id)            
+
     def destroy(self):
         print('destroying actors')
         for actor in self.actor_list:
             actor.destroy()
-        print('done.')
+        print('actors destroyed')
+
 
 class Car(object):
     def __init__(self, vehicle_bp, transform, carla_world):
@@ -54,11 +74,13 @@ class Car(object):
         self.vehicle = self.world.world.spawn_actor(bp, self.vehicle_transform)
         self.world.actor_list.append(self.vehicle)
 
+
 class Camera(object):
-    def __init__(self, sensor_bp, transform, parent_actor):
+    def __init__(self, sensor_bp, transform, parent_actor, agent):
         self.vehicle = parent_actor
         self.camera_transform = transform
         self.world = self.vehicle.world
+        self.agent = agent
 
         bp = self.world.blueprint_library.find(sensor_bp)
         bp.set_attribute('image_size_x', f'{IM_WIDTH}')
@@ -77,13 +99,16 @@ class Camera(object):
         self = weak_self()
         if not self:
             return
-        # data.save_to_disk('_out/%08d_%i' % (data.frame_number, self.sensor.id))
+        ## TODO ##
+        # update locatoin, velocity, and obstacle list in agent #
+
 
 class Lidar(object):
-    def __init__(self, sensor_bp, transform, parent_actor):
+    def __init__(self, sensor_bp, transform, parent_actor, agent):
         self.vehicle = parent_actor
         self.camera_transform = transform
         self.world = self.vehicle.world
+        self.agent = agent
 
         bp = self.world.blueprint_library.find(sensor_bp)
         bp.set_attribute('sensor_tick', f'{SENSOR_TICK}')
@@ -93,16 +118,18 @@ class Lidar(object):
         self.world.actor_list.append(self.sensor)
 
         weak_self = weakref.ref(self)
-        # self.sensor.listen(lambda image: Lidar.callback(weak_self,image))
+        self.sensor.listen(lambda image: Lidar.callback(weak_self,image))
 
     @staticmethod
     def callback(weak_self, data):
         self = weak_self()
         if not self:
             return
-        # data.save_to_disk('_out/%08d_%i' % (data.frame_number, self.sensor.id))
+        ## TODO ##
+        # update locatoin, velocity, and obstacle list in agent #
 
-def main():
+
+def test():
     world = None
 
     try:
@@ -134,4 +161,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    test()

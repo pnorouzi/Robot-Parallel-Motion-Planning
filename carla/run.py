@@ -18,65 +18,90 @@ try:
 except IndexError:
     pass
 
-import carla
-from agents.navigation.roaming_agent import RoamingAgent
-from agents.navigation.basic_agent import BasicAgent
-
+import math
+import numpy as np
 import random
 import time
 import threading
-# import pygame
-import weakref
+
+import carla
+from agents.navigation.basic_agent import BasicAgent
+
+from cuda_agent import *
 from environment import *
 
+DEBUG = True
+NUM_OBSTACLES = 0
+SPAWN_POINT_INDICES = [116,198,116]
+AGENT = 'basic'
 
-def game_loop():
+
+def game_loop(options_dict):
     world = None
 
     try:
+        # load the client and change the world
         client = carla.Client('localhost', 2000)
         client.set_timeout(5.0)
-        if client.get_world() != 1230765172743732701:
-            client.load_world('Town05') 
+
+        print('Changing world to Town 5')
+        client.load_world('Town05') 
 
         world = World(client.get_world())
 
-        # settings = world.world.get_settings()
-        # settings.fixed_delta_seconds = 0.2
-        # settings.synchronous_mode = True
-        # world.world.apply_settings(settings)
-
+        spawn_points = world.world.get_map().get_spawn_points()
 
         vehicle_bp = 'model3'
-        vehicle_transform = carla.Transform(carla.Location(x=46.1, y=-5.6, z=0.5), carla.Rotation(yaw=-177))
+        vehicle_transform = spawn_points[options_dict['spawn_point_indices'][0]]
         
         vehicle = Car(vehicle_bp, vehicle_transform, world)
 
-        agent = agent = BasicAgent(vehicle.vehicle)
+        if options_dict['agent'] == 'cuda':
+            agent = CudaAgent(vehicle.vehicle)
+        else:
+            agent = BasicAgent(vehicle.vehicle)
         
-        spawn_point = carla.Transform(carla.Location(x=-127.8, y=68.9, z=0.5), carla.Rotation(yaw=90))
-        print(spawn_point)
-        agent.set_destination((spawn_point.location.x, spawn_point.location.y, spawn_point.location.z))
+        destination_point = spawn_points[options_dict['spawn_point_indices'][1]].location
+
+        print('Going to ', destination_point)
+        agent.set_destination((destination_point.x, destination_point.y, destination_point.z))
         
         camera_bp = ['sensor.camera.rgb', 'sensor.camera.rgb', 'sensor.lidar.ray_cast']
         camera_transform = [carla.Transform(carla.Location(x=1.5, z=2.4), carla.Rotation(pitch=-15, yaw=40)), carla.Transform(carla.Location(x=1.5, z=2.4), carla.Rotation(pitch=-15, yaw=-40)), carla.Transform(carla.Location(x=1.5, z=2.4))]
 
-        cam1 = Camera(camera_bp[0], camera_transform[0], vehicle)
-        cam2 = Camera(camera_bp[1], camera_transform[1], vehicle)
-        lidar = Lidar(camera_bp[2], camera_transform[2], vehicle)
+        cam1 = Camera(camera_bp[0], camera_transform[0], vehicle, agent)
+        cam2 = Camera(camera_bp[1], camera_transform[1], vehicle, agent)
+        lidar = Lidar(camera_bp[2], camera_transform[2], vehicle, agent)
 
+        world.create_obstacles(options_dict['num_obstacles'])
+
+        prev_location = vehicle.vehicle.get_location()
+
+        sp = 2
         while True:
             world_snapshot = world.world.wait_for_tick(10.0)
 
             if not world_snapshot:
                 continue
 
-            control = agent.run_step()
-           
-            control.manual_gear_shift = False
+            control = agent.run_step(options_dict['debug'])
             vehicle.vehicle.apply_control(control)
 
             world.world.tick()
+
+            current_location = vehicle.vehicle.get_location()
+
+            if current_location.distance(prev_location) <= 0.0 and current_location.distance(destination_point) <= 10:
+                print('distance from destination: ', current_location.distance(destination_point))
+                if len(options_dict['spawn_point_indices']) <= sp:
+                    break
+                else:
+                    destination_point = spawn_points[options_dict['spawn_point_indices'][sp]].location
+                    print('Going to ', destination_point)
+                    agent.set_destination((destination_point.x, destination_point.y, destination_point.z))
+                    sp += 1
+
+            prev_location = current_location
 
 
     finally:
@@ -85,4 +110,17 @@ def game_loop():
 
 
 if __name__ == '__main__':
-    game_loop()
+    sensor_dict = {
+        'IM_WIDTH': 400,
+        'IM_HEIGHT': 300,
+        'SENSOR_TICK': 0.2
+    }
+    sensor_attributes(sensor_dict)
+
+    options_dict = {
+        'agent': AGENT,
+        'spawn_point_indices': SPAWN_POINT_INDICES,
+        'num_obstacles': NUM_OBSTACLES,
+        'debug': DEBUG
+    }
+    game_loop(options_dict)
