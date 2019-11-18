@@ -31,7 +31,7 @@ from cuda_agent import *
 from environment import *
 
 DEBUG = True
-NUM_OBSTACLES = 0
+NUM_OBSTACLES = 25
 SPAWN_POINT_INDICES = [116,198,116]
 AGENT = 'basic'
 
