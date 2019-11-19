@@ -92,6 +92,7 @@ class Camera(object):
         self.camera_transform = transform
         self.world = self.vehicle.world
         self.agent = agent
+        self.typeofCamera = sensor_bp
 
         bp = self.world.blueprint_library.find(sensor_bp)
         bp.set_attribute('image_size_x', f'{IM_WIDTH}')
@@ -104,20 +105,20 @@ class Camera(object):
         self.world.actor_list.append(self.sensor)
 
         weak_self = weakref.ref(self)
-        self.sensor.listen(lambda image: Camera.callback(weak_self,image, typeofCamera=sensor_bp))
+        self.sensor.listen(lambda image: Camera.callback(weak_self,image))
 
     @staticmethod
-    def callback(weak_self, data,typeofCamera):
+    def callback(weak_self, data):
         self = weak_self()
         if not self:
             return
         ## TODO ##
         # update locatoin, velocity, and obstacle list in agent #
 
-        if typeofCamera == "sensor.camera.depth":
+        if self.typeofCamera == "sensor.camera.depth":
             self.process_depth(weak_self,data)
 
-        elif typeofCamera == "sensor.camera.semantic_segmentation":
+        elif self.typeofCamera == "sensor.camera.semantic_segmentation":
             self.process_segment(weak_self,data)
         else:
             self.process_img(weak_self,data)
