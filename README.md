@@ -10,3 +10,4 @@ Robot-Parallel-Motion-Planning
 ## Milestones:
 
 * [Pitch](files/CIS%20565%20Final%20Project%20Final%20project%20Pitch.pdf)
+* [Milestone 1](files/CIS565_RPMP-milestone1.pdf)
