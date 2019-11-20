@@ -44,9 +44,16 @@ def sensor_attributes(options_dict):
 class World(object):
     def __init__(self, carla_world):
         self.world = carla_world
+        
         self.map = self.world.get_map()
         self.blueprint_library = self.world.get_blueprint_library()
         self.actor_list = []
+        self.sensor_buffer = {}
+        print('enabling synchronous mode.')
+        settings = self.world.get_settings()
+        settings.fixed_delta_seconds = 0.05
+        settings.synchronous_mode = True
+        self.world.apply_settings(settings)
 
     def create_obstacles(self, num_obstacles):
         obstacles = 0
@@ -81,6 +88,7 @@ class Car(object):
         self.world.actor_list.append(self.vehicle)
 
 
+
 class Camera(object):
 
     def __init__(self, sensor_bp, transform, parent_actor, agent):
@@ -88,7 +96,7 @@ class Camera(object):
         self.camera_transform = transform
         self.world = self.vehicle.world
         self.agent = agent
-
+        self.frame_n = 0
         bp = self.world.blueprint_library.find(sensor_bp)
         bp.set_attribute('image_size_x', f'{IM_WIDTH}')
         bp.set_attribute('image_size_y', f'{IM_HEIGHT}')
@@ -131,10 +139,24 @@ class Camera(object):
         normalized_depth = np.dot(image, [65536.0, 256.0, 1.0])
         normalized_depth /= 16777215.0
 
-        in_meters_arr = np.zeros((normalized_depth.shape[0],normalized_depth.shape[1],1))
+        #print(self.world.sensor_buffer.keys())
 
-        in_meters_arr[:,:,0] = normalized_depth
+        self.world.sensor_buffer['depth'] = normalized_depth
+        self.frame_n = depthData.frame_number
 
+        # if depthData.frame_number in self.world.sensor_buffer:
+        #     print(depthData.frame_number,' worked!')
+        #     self.world.sensor_buffer[str(depthData.frame_number)] = normalized_depth
+        #     del self.world.sensor_buffer[depthData.frame_number]
+
+        # in_meters_arr = np.zeros((normalized_depth.shape[0],normalized_depth.shape[1],1))
+
+        # in_meters_arr[:,:,0] = normalized_depth
+
+
+
+        
+        # cv2.imwrite('./out/DEPTH_'+str(depthData.frame_number)+'.png', image)
         # cv2.imshow("Depth",in_meters_arr)
         # cv2.waitKey(1)
 
@@ -148,6 +170,9 @@ class Camera(object):
         image = np.array(imageData.raw_data)
         image = image.reshape((IM_HEIGHT,IM_WIDTH,4))
         image = image[:,:,:3]
+
+        print('IMG_'+str(imageData.frame_number)+'.png')
+        cv2.imwrite('IMG_'+str(imageData.frame_number)+'.png', image)
 
         #print(image.shape)
         #cv2.imshow("Camera",image)
@@ -165,17 +190,27 @@ class Camera(object):
         image = image[:,:,:3]
 
         bboxes =self.create_bbox(weak_self,image[:,:,2])
+        print('SEG_'+str(segmentData.frame_number)+'.png')
 
-        vis_img = self.trans_vis_segment(image)
+
+        self.world.sensor_buffer['segment'] = bboxes
+        self.frame_n = segmentData.frame_number
 
 
-        for i in bboxes[10]:
-             start_point = (i[1],i[0])
-             end_point = (i[3],i[2])
-             vis_img = cv2.rectangle(vis_img, start_point, end_point, (0, 0, 142), 1) 
+        #vis_img = self.trans_vis_segment(image)
 
-        # print('seg_'+str(segmentData.frame_number)+'.png')
-        # cv2.imwrite('seg_'+str(segmentData.frame_number)+'.png', vis_img)
+
+
+        # if 10 in bboxes.keys():
+
+        #     for i in bboxes[10]:
+        #          start_point = (i[1],i[0])
+        #          end_point = (i[3],i[2])
+        #          vis_img = cv2.rectangle(vis_img, start_point, end_point, (0, 0, 142), 2)
+            
+
+        #print('SEG_'+str(segmentData.frame_number)+'.png')
+        # cv2.imwrite('./out/SEG_'+str(segmentData.frame_number)+'.png', vis_img)
         #cv2.imshow("Camera",image)
         #cv2.waitKey(1)
 
@@ -194,7 +229,7 @@ class Camera(object):
 
         for i in range(segment_map.shape[0]):
             for j in range(segment_map.shape[1]):
-                if (i,j) in visited_global.keys() or segment_map[i,j] !=10:
+                if (i,j) in visited_global.keys() or segment_map[i,j] != 10:
                     continue
 
 
@@ -216,44 +251,44 @@ class Camera(object):
                     #print(ind)
                     val = segment_map[ind[0],ind[1]]
 
-                    if ind[0]+1<size_x and ind[1]-1<size_y and ind[0]+1>=0 and ind[1]-1>=0 and segment_map[ind[0]+1,ind[1]-1] == val and (ind[0]+1,ind[1]-1) not in visited.keys():
+                    if ind[0]+1<size_x and ind[1]-1<size_y and ind[0]+1>=0 and ind[1]-1>=0 and segment_map[ind[0]+1,ind[1]-1] == val and (ind[0]+1,ind[1]-1) not in visited.keys() and (ind[0]+1,ind[1]-1) not in visited_global.keys():
                         queue.append((ind[0]+1,ind[1]-1))
                         visited[(ind[0]+1,ind[1]-1)] = True
                         visited_global[(ind[0]+1,ind[1]-1)] = True
 
-                    if ind[0]+1<size_x and ind[1]<size_y and ind[0]+1>=0 and ind[1]>=0 and segment_map[ind[0]+1,ind[1]] == val and (ind[0]+1,ind[1]) not in visited.keys():
+                    if ind[0]+1<size_x and ind[1]<size_y and ind[0]+1>=0 and ind[1]>=0 and segment_map[ind[0]+1,ind[1]] == val and (ind[0]+1,ind[1]) not in visited.keys() and (ind[0]+1,ind[1]) not in visited_global.keys():
                         queue.append((ind[0]+1,ind[1]))
                         visited[(ind[0]+1,ind[1])] = True
                         visited_global[(ind[0]+1,ind[1])] = True
 
-                    if ind[0]+1<size_x and ind[1]+1<size_y and ind[0]+1>=0 and ind[1]+1>=0 and segment_map[ind[0]+1,ind[1]+1] == val and (ind[0]+1,ind[1]+1) not in visited.keys():
+                    if ind[0]+1<size_x and ind[1]+1<size_y and ind[0]+1>=0 and ind[1]+1>=0 and segment_map[ind[0]+1,ind[1]+1] == val and (ind[0]+1,ind[1]+1) not in visited.keys() and (ind[0]+1,ind[1]+1) not in visited_global.keys():
                         queue.append((ind[0]+1,ind[1]+1))
                         visited[(ind[0]+1,ind[1]+1)] = True
                         visited_global[(ind[0]+1,ind[1]+1)] = True
 
-                    if ind[0]<size_x and ind[1]-1<size_y and ind[0]>=0 and ind[1]-1>=0 and segment_map[ind[0],ind[1]-1] == val and (ind[0],ind[1]-1) not in visited.keys():
+                    if ind[0]<size_x and ind[1]-1<size_y and ind[0]>=0 and ind[1]-1>=0 and segment_map[ind[0],ind[1]-1] == val and (ind[0],ind[1]-1) not in visited.keys() and (ind[0],ind[1]-1) not in visited_global.keys():
                         queue.append((ind[0],ind[1]-1))
                         visited[(ind[0],ind[1]-1)] = True
                         visited_global[(ind[0],ind[1]-1)] = True
 
-                    if ind[0]<size_x and ind[1]+1<size_y and ind[0]>=0 and ind[1]+1>=0 and segment_map[ind[0],ind[1]+1] == val and (ind[0],ind[1]+1) not in visited.keys():
+                    if ind[0]<size_x and ind[1]+1<size_y and ind[0]>=0 and ind[1]+1>=0 and segment_map[ind[0],ind[1]+1] == val and (ind[0],ind[1]+1) not in visited.keys() and (ind[0],ind[1]+1) not in visited_global.keys():
                         queue.append((ind[0],ind[1]+1))
                         visited[(ind[0],ind[1]+1)] = True
                         visited_global[(ind[0],ind[1]+1)] = True
 
-                    if (ind[0]-1<size_x) and (ind[1]-1<size_y) and (ind[0]-1>=0) and (ind[1]-1>=0) and (segment_map[ind[0]-1,ind[1]-1] == val) and ((ind[0]-1,ind[1]-1) not in visited.keys()):
+                    if (ind[0]-1<size_x) and (ind[1]-1<size_y) and (ind[0]-1>=0) and (ind[1]-1>=0) and (segment_map[ind[0]-1,ind[1]-1] == val) and ((ind[0]-1,ind[1]-1) not in visited.keys()) and ((ind[0]-1,ind[1]-1) not in visited_global.keys()):
                         #print('here 1')
                         queue.append((ind[0]-1,ind[1]-1))
                         visited[(ind[0]-1,ind[1]-1)] = True
                         visited_global[(ind[0]-1,ind[1]-1)] = True
 
-                    if (ind[0]-1<size_x) and (ind[1]<size_y) and (ind[0]-1>=0) and (ind[1]>=0) and (segment_map[ind[0]-1,ind[1]] == val) and ((ind[0]-1,ind[1]) not in visited.keys()):
+                    if (ind[0]-1<size_x) and (ind[1]<size_y) and (ind[0]-1>=0) and (ind[1]>=0) and (segment_map[ind[0]-1,ind[1]] == val) and ((ind[0]-1,ind[1]) not in visited.keys()) and ((ind[0]-1,ind[1]) not in visited_global.keys()):
                         #print('here 2')
                         queue.append((ind[0]-1,ind[1]))
                         visited[(ind[0]-1,ind[1])] = True
                         visited_global[(ind[0]-1,ind[1])] = True
 
-                    if (ind[0]-1<size_x) and (ind[1]+1<size_y) and (ind[0]-1>=0) and (ind[1]+1>=0) and (segment_map[ind[0]-1,ind[1]+1] == val) and ((ind[0]-1,ind[1]+1) not in visited.keys()):
+                    if (ind[0]-1<size_x) and (ind[1]+1<size_y) and (ind[0]-1>=0) and (ind[1]+1>=0) and (segment_map[ind[0]-1,ind[1]+1] == val) and ((ind[0]-1,ind[1]+1) not in visited.keys()) and ((ind[0]-1,ind[1]+1) not in visited_global.keys()):
                         #print('here 3')
                         queue.append((ind[0]-1,ind[1]+1))
                         visited[(ind[0]-1,ind[1]+1)] = True

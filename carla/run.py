@@ -31,9 +31,13 @@ from cuda_agent import *
 from environment import *
 
 DEBUG = False
-NUM_OBSTACLES = 50
+NUM_OBSTACLES = 20
 SPAWN_POINT_INDICES = [116,198,116]
 AGENT = 'basic'
+
+def do_something(world_snapshot):
+    print(world_snapshot)
+
 
 
 def game_loop(options_dict):
@@ -42,7 +46,7 @@ def game_loop(options_dict):
     try:
         # load the client and change the world
         client = carla.Client('localhost', 2000)
-        client.set_timeout(60.0)
+        client.set_timeout(30.0)
 
         print('Changing world to Town 5')
         client.load_world('Town05') 
@@ -69,25 +73,51 @@ def game_loop(options_dict):
         camera_bp = ['sensor.camera.rgb', "sensor.camera.semantic_segmentation", "sensor.camera.depth"]
         camera_transform = carla.Transform(carla.Location(x= 2.5,z=2))
 
+        
+
         #camera = Camera(camera_bp[0], camera_transform, vehicle, agent)
-        segment= Camera(camera_bp[1], camera_transform, vehicle, agent)
-        depth = Camera(camera_bp[2], camera_transform, vehicle, agent)
+        
+        #camera = Camera(camera_bp[0], camera_transform, vehicle, agent)
+        
+        
+        #
+        #depth = Camera(camera_bp[2], camera_transform, vehicle, agent)
 
         world.create_obstacles(options_dict['num_obstacles'])
 
         prev_location = vehicle.vehicle.get_location()
 
+        depth = Camera(camera_bp[2], camera_transform, vehicle, agent)
+
+        segment= Camera(camera_bp[1], camera_transform, vehicle, agent)
+
+        #print(depth.sensor)
+
+        
+
         sp = 2
         while True:
-            world_snapshot = world.world.wait_for_tick(60.0)
+            world.world.tick()
+
+            world_snapshot = world.world.wait_for_tick(10.0)
+
+            #world.world.on_tick(lambda world_snapshot: do_something(world_snapshot))
+            #print(world_snapshot.frame_count,'world frame')
+
+
 
             if not world_snapshot:
                 continue
 
+            while world_snapshot.frame_count!=depth.frame_n or world_snapshot.frame_count!=segment.frame_n:
+                #print('True')
+                time.sleep(0.05)
+            #print('Made it')
+
             control = agent.run_step(options_dict['debug'])
             vehicle.vehicle.apply_control(control)
 
-            world.world.tick()
+            
 
             current_location = vehicle.vehicle.get_location()
 
