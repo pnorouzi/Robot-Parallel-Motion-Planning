@@ -30,6 +30,7 @@ import networkx as nx
 import matplotlib.pyplot as plt
 from agents.navigation.local_planner import RoadOption
 from agents.tools.misc import vector
+from agents.tools.misc import draw_waypoints
 
 def get_topology(mp):
     """
@@ -144,42 +145,50 @@ def main():
         world = client.get_world()
         mp = world.get_map()
 
-        topology = get_topology(mp)
-        G, id_map, road_id_to_edge = build_graph(topology)
-        # plt.subplot(121)
+        wp = mp.generate_waypoints(5)
+        print(len(wp))
 
-        nx.draw(G) #, with_labels=True, font_weight='bold')
-        # plt.subplot(122)
+        draw_waypoints(world, wp)
 
-        # nx.draw_shell(G, nlist=[range(5, 10), range(5)], with_labels=True, font_weight='bold')
-        plt.show()
-        plt.savefig("path.png")
+        # for w in wp:
+        #     print(wp)
+
+        # topology = get_topology(mp)
+        # G, id_map, road_id_to_edge = build_graph(topology)
+        # # plt.subplot(121)
+
+        # nx.draw(G) #, with_labels=True, font_weight='bold')
+        # # plt.subplot(122)
+
+        # # nx.draw_shell(G, nlist=[range(5, 10), range(5)], with_labels=True, font_weight='bold')
+        # plt.show()
+        # plt.savefig("path.png")
 
         # The world contains the list blueprints that we can use for adding new
         # actors into the simulation.
-        blueprint_library = world.get_blueprint_library()
+        # blueprint_library = world.get_blueprint_library()
 
         # Now let's filter all the blueprints of type 'vehicle' and choose one
         # at random.
-        vehicle_bp = blueprint_library.filter('model3')[0]
+        # vehicle_bp = blueprint_library.filter('model3')[0]
 
         # Now we need to give an initial transform to the vehicle. We choose a
         # random transform from the list of recommended spawn points of the map.
-        vehicle_transform = random.choice(world.get_map().get_spawn_points())
+        # vehicle_transform = random.choice(world.get_map().get_spawn_points())
 
         # So let's tell the world to spawn the vehicle.
-        vehicle = world.spawn_actor(vehicle_bp, vehicle_transform)
+        # vehicle = world.spawn_actor(vehicle_bp, vehicle_transform)
 
         # It is important to note that the actors we create won't be destroyed
         # unless we call their "destroy" function. If we fail to call "destroy"
         # they will stay in the simulation even after we quit the Python script.
         # For that reason, we are storing all the actors we create so we can
         # destroy them afterwards.
-        actor_list.append(vehicle)
-        print('created %s' % vehicle.type_id)
+        # actor_list.append(vehicle)
+        # print('created %s' % vehicle.type_id)
 
         # Let's put the vehicle to drive around.
-        vehicle.set_autopilot(True)
+        # vehicle.set_autopilot(True)
 
         # Let's add now a "depth" camera attached to the vehicle. Note that the
         # transform we give here is now relative to the vehicle.
@@ -197,7 +206,7 @@ def main():
         # cc = carla.ColorConverter.LogarithmicDepth
         
 
-        time.sleep(5)
+        time.sleep(30)
 
     finally:
 

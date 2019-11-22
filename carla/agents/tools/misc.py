@@ -29,7 +29,7 @@ def draw_waypoints(world, waypoints, z=0.5):
         begin = t.location + carla.Location(z=z)
         angle = math.radians(t.rotation.yaw)
         end = begin + carla.Location(x=math.cos(angle), y=math.sin(angle))
-        world.debug.draw_arrow(begin, end, arrow_size=0.3, life_time=1.0)
+        world.debug.draw_arrow(begin, end, thickness= 0.5, arrow_size=0.3, life_time=60)
 
 
 def get_speed(vehicle):

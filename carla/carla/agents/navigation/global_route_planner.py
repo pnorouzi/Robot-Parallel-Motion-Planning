@@ -208,8 +208,10 @@ class GlobalRoutePlanner(object):
                             sv = select_edge['net_vector']
                             cross_list.append(np.cross(cv, sv)[2])
                 next_cross = np.cross(cv, nv)[2]
-                deviation = math.acos(np.dot(cv, nv) /\
-                    (np.linalg.norm(cv)*np.linalg.norm(nv)))
+                # deviation = math.acos(np.dot(cv, nv) /\
+                #     (np.linalg.norm(cv)*np.linalg.norm(nv)))
+                d = max(-1,min(1,np.dot(cv, nv)/ np.linalg.norm(cv)*np.linalg.norm(nv)))
+                deviation = math.acos(d)
                 if not cross_list:
                     cross_list.append(0)
                 if deviation < threshold:
