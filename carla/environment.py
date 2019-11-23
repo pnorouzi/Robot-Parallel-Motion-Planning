@@ -49,31 +49,66 @@ class World(object):
         self.blueprint_library = self.world.get_blueprint_library()
         self.actor_list = []
         self.sensor_buffer = {}
-        print('enabling synchronous mode.')
+
+        print('Enabling synchronous mode.')
         settings = self.world.get_settings()
         settings.fixed_delta_seconds = 0.05
         settings.synchronous_mode = True
         self.world.apply_settings(settings)
 
-        settings = self.world.get_settings()
-        settings.synchronous_mode = True
-        self.world.apply_settings(settings)
+    def create_samples(self, start, goal, waypoint_dist = 5, disk_radius = 10, num_yaw = 4):
+        print(f'Creating samples {waypoint_dist}m apart with {num_yaw} yaw vaules and neighbors within {disk_radius}m.')
+
+        wp = []
+        for mp in self.map.generate_waypoints(waypoint_dist):
+            wp.append(mp.transform)
+
+        wp.append(start)
+        wp.append(goal)
+
+        self.waypoints = []
+        self.neighbors = []
+
+        # for each waypoint wp
+        for i, wi in enumerate(wp):
+            li = wi.location
+            ni = []
+            # find other waypoints within disk radius
+            for j, wj in enumerate(wp):
+                lj = wj.location
+                if li == lj:
+                    continue
+                elif li.distance(lj) <= disk_radius:
+                    # account for index shifts with adding in orientation
+                    for k in range(num_yaw):
+                        ni.append(j*num_yaw + k)
+            
+            # add in number of yaw orientations to waypoint list
+            ri = wi.rotation
+            for k in range(num_yaw):
+                self.neighbors.append(ni)
+
+                ri.yaw = ri.yaw + k*360/num_yaw
+                if ri.yaw >= 360:
+                    ri.yaw = ri.yaw - 360
+                self.waypoints.append([li.x, li.y, ri.yaw])
 
     def create_obstacles(self, num_obstacles):
+        print(f'Creating {num_obstacles} obstacles.')
         obstacles = 0
+        # continue randomly spawning obstacles until desired number reached
         while obstacles < num_obstacles:
             transform = random.choice(self.world.get_map().get_spawn_points())
-            transform.rotation.yaw = random.randrange(-180.0, 180.0, 1.0)
+            transform.rotation.yaw = random.randrange(-180.0, 180.0, 1.0) # get random yaw orientation so vehicles don't line up
 
-            bp = random.choice(self.blueprint_library.filter('vehicle'))
+            bp = random.choice(self.blueprint_library.filter('vehicle')) # random vehicle for fun
 
             # This time we are using try_spawn_actor. If the spot is already
             # occupied by another object, the function will return None.
             npc = self.world.try_spawn_actor(bp, transform)
             if npc is not None:
                 self.actor_list.append(npc)
-                obstacles += 1
-                # print('obstacle created %s' % npc.type_id)            
+                obstacles += 1            
 
     def destroy(self):
         print('destroying actors')
@@ -89,7 +124,7 @@ class Car(object):
         bp = self.world.blueprint_library.filter(vehicle_bp)[0]
         self.vehicle_transform = transform
         self.vehicle = self.world.world.spawn_actor(bp, self.vehicle_transform)
-        self.world.actor_list.append(self.vehicle)
+        self.world.actor_list.append(self.vehicle) # add to actor_list of world so we can clean up later
 
 
 
@@ -111,7 +146,7 @@ class Camera(object):
 
         self.sensor = self.world.world.spawn_actor(bp, self.camera_transform, attach_to=self.vehicle.vehicle)
         
-        self.world.actor_list.append(self.sensor)
+        self.world.actor_list.append(self.sensor) # add to actor_list of world so we can clean up later
 
         weak_self = weakref.ref(self)
         self.sensor.listen(lambda image: Camera.callback(weak_self,image))
@@ -177,8 +212,8 @@ class Camera(object):
         image = image.reshape((IM_HEIGHT,IM_WIDTH,4))
         image = image[:,:,:3]
 
-        print('IMG_'+str(imageData.frame_number)+'.png')
-        cv2.imwrite('IMG_'+str(imageData.frame_number)+'.png', image)
+        # print('IMG_'+str(imageData.frame_number)+'.png')
+        # cv2.imwrite('IMG_'+str(imageData.frame_number)+'.png', image)
 
         #print(image.shape)
         #cv2.imshow("Camera",image)
@@ -196,7 +231,7 @@ class Camera(object):
         image = image[:,:,:3]
 
         bboxes =self.create_bbox(weak_self,image[:,:,2])
-        print('SEG_'+str(segmentData.frame_number)+'.png')
+        # print('SEG_'+str(segmentData.frame_number)+'.png')
 
 
         self.world.sensor_buffer['segment'] = bboxes

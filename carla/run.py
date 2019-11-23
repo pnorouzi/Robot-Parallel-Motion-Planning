@@ -30,16 +30,10 @@ from agents.navigation.basic_agent import BasicAgent
 from cuda_agent import *
 from environment import *
 
-DEBUG = True
-NUM_OBSTACLES = 25
 DEBUG = False
-NUM_OBSTACLES = 20
+NUM_OBSTACLES = 25
 SPAWN_POINT_INDICES = [116,198,116]
 AGENT = 'basic'
-
-def do_something(world_snapshot):
-    print(world_snapshot)
-
 
 
 def game_loop(options_dict):
@@ -50,81 +44,68 @@ def game_loop(options_dict):
         client = carla.Client('localhost', 2000)
         client.set_timeout(30.0)
 
-        print('Changing world to Town 5')
+        print('Changing world to Town 5.')
         client.load_world('Town05') 
 
+        # create world object
         world = World(client.get_world())
-
         spawn_points = world.world.get_map().get_spawn_points()
 
+        # spawn vehicle
         vehicle_bp = 'model3'
         vehicle_transform = spawn_points[options_dict['spawn_point_indices'][0]]
-        
+        print(f'Starting from {vehicle_transform}.')
         vehicle = Car(vehicle_bp, vehicle_transform, world)
 
+        # select control agent
         if options_dict['agent'] == 'cuda':
             agent = CudaAgent(vehicle.vehicle)
         else:
             agent = BasicAgent(vehicle.vehicle)
         
-        destination_point = spawn_points[options_dict['spawn_point_indices'][1]].location
+        # get and set destination
+        destination_transform = spawn_points[options_dict['spawn_point_indices'][1]]
+        destination_point = destination_transform.location
 
-        print('Going to ', destination_point)
+        print(f'Going to {destination_transform}.')
         agent.set_destination((destination_point.x, destination_point.y, destination_point.z))
         
-        camera_bp = ['sensor.camera.rgb', "sensor.camera.semantic_segmentation", "sensor.camera.depth"]
-        camera_transform = carla.Transform(carla.Location(x= 2.5,z=2))
+        # attach sensors to vehicle
+        sensor_bp = ['sensor.camera.rgb', "sensor.camera.semantic_segmentation", "sensor.camera.depth"]
+        sensor_transform = carla.Transform(carla.Location(x= 2.5,z=2))
 
-        
+        depth = Camera(sensor_bp[2], sensor_transform, vehicle, agent)
+        segment= Camera(sensor_bp[1], sensor_transform, vehicle, agent)
 
-        #camera = Camera(camera_bp[0], camera_transform, vehicle, agent)
-        
-        #camera = Camera(camera_bp[0], camera_transform, vehicle, agent)
-        
-        
-        #
-        #depth = Camera(camera_bp[2], camera_transform, vehicle, agent)
-
+        # add obstacles and get sample nodes
         world.create_obstacles(options_dict['num_obstacles'])
+        world.create_samples(vehicle_transform, destination_transform)
 
+        # run the simulation
         prev_location = vehicle.vehicle.get_location()
-
-        depth = Camera(camera_bp[2], camera_transform, vehicle, agent)
-
-        segment= Camera(camera_bp[1], camera_transform, vehicle, agent)
-
-        #print(depth.sensor)
-
-        
-
         sp = 2
         while True:
+            # wait for server to be ready
             world.world.tick()
-
             world_snapshot = world.world.wait_for_tick(10.0)
-
-            #world.world.on_tick(lambda world_snapshot: do_something(world_snapshot))
-            #print(world_snapshot.frame_count,'world frame')
-
-
 
             if not world_snapshot:
                 continue
 
+            # wait for sensors to sync
             while world_snapshot.frame_count!=depth.frame_n or world_snapshot.frame_count!=segment.frame_n:
-                #print('True')
                 time.sleep(0.05)
-            #print('Made it')
 
+            # plan, get control inputs, and apply to vehicle
             control = agent.run_step(options_dict['debug'])
             vehicle.vehicle.apply_control(control)
 
-            
-
+            # check if destination reached
             current_location = vehicle.vehicle.get_location()
-
-            if current_location.distance(prev_location) <= 0.0 and current_location.distance(destination_point) <= 10:
+            # kind of hacky way to test destination reached and doesn't always work - may have to manually stop with ctrl c
+            if current_location.distance(prev_location) <= 0.0 and current_location.distance(destination_point) <= 10: 
                 print('distance from destination: ', current_location.distance(destination_point))
+                # if out of destinations break else go to next destination
                 if len(options_dict['spawn_point_indices']) <= sp:
                     break
                 else:
@@ -134,7 +115,6 @@ def game_loop(options_dict):
                     sp += 1
 
             prev_location = current_location
-
 
     finally:
         if world is not None:
