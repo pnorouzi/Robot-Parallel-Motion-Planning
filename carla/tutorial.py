@@ -148,53 +148,65 @@ def main():
         world = client.get_world()
         mp = world.get_map()
 
-        # wp = mp.generate_waypoints(5)
-        # print(len(wp))
+        wp = mp.generate_waypoints(5)
+        print(len(wp))
 
-        # disk_radius = 10
-        # num_yaw = 4
-        # waypoint_dist = 5
+        disk_radius = 10
+        num_yaw = 8
+        waypoint_dist = 5
 
-        # print(f'creating samples {waypoint_dist}m apart with {num_yaw} yaw vaules and neighbors within {disk_radius}m.')
+        print(f'creating samples {waypoint_dist}m apart with {num_yaw} yaw vaules and neighbors within {disk_radius}m.')
 
 
-        # waypoints = []
-        # neighbors = []
+        waypoints = []
+        neighbors = []
 
-        # for i, wi in enumerate(wp):
-        #     li = wi.transform.location
-        #     ni = []
-        #     for j, wj in enumerate(wp):
-        #         lj = wj.transform.location
-        #         if li == lj:
-        #             continue
-        #         elif li.distance(lj) <= disk_radius:
-        #             for k in range(num_yaw):
-        #                 ni.append(j*num_yaw + k)
+        for i, wi in enumerate(wp):
+            li = wi.transform.location
+            ni = []
+            for j, wj in enumerate(wp):
+                lj = wj.transform.location
+                if li == lj:
+                    continue
+                elif li.distance(lj) <= disk_radius:
+                    for k in range(num_yaw):
+                        if k == (num_yaw)/2:
+                            continue
+                        elif k > (num_yaw)/2:
+                            ni.append(j*(num_yaw-1) + k-1)
+                        else:
+                            ni.append(j*(num_yaw-1) + k)
             
-        #     ri = wi.transform.rotation
-        #     for k in range(num_yaw):
-        #         neighbors.append(ni)
+            ri = wi.transform.rotation
+            for k in range(num_yaw):
+                if k == (num_yaw)/2:
+                    continue
 
-        #         ri.yaw = ri.yaw + k*360/num_yaw
-        #         if ri.yaw >= 360:
-        #             ri.yaw = ri.yaw - 360
-        #         waypoints.append([li.x, li.y, ri.yaw])
+                neighbors.append(ni)
 
-        # print(len(waypoints), len(neighbors))
+                theta = ri.yaw + k*360/(num_yaw)
+                if theta >= 180:
+                    theta = theta - 360
+                elif theta <= -180:
+                    theta = 360 - theta
+                waypoints.append([li.x, li.y, theta])
+            break
+
+        print(waypoints, neighbors)
+        print(len(waypoints), len(neighbors))
 
         # draw_waypoints(world, wp) 
 
         # spawn vehicle
-        spawn_points = world.get_map().get_spawn_points()
-        vehicle_bp = 'model3'
-        vehicle_transform = spawn_points[0]
+        # spawn_points = world.get_map().get_spawn_points()
+        # vehicle_bp = 'model3'
+        # vehicle_transform = spawn_points[0]
 
-        bp = world.get_blueprint_library().filter(vehicle_bp)[0]
-        print(bp)
-        vehicle = world.spawn_actor(bp, vehicle_transform)
-        print(vehicle)
-        actor_list.append(vehicle)
+        # bp = world.get_blueprint_library().filter(vehicle_bp)[0]
+        # print(bp)
+        # vehicle = world.spawn_actor(bp, vehicle_transform)
+        # print(vehicle)
+        # actor_list.append(vehicle)
 
 
         time.sleep(5)
