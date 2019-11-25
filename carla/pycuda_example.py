@@ -50,3 +50,17 @@ if __name__ == '__main__':
 
     print(dest)
     print(c)
+
+    start = 0
+
+    n = 6
+    parent = np.full((n,1), -1)
+    cost = np.full((n,1), np.inf)
+    cost[start] = 0
+
+    Vunexplored = np.full((n,1), 1) 
+    Vopen = np.full((n,1), 0)
+
+    Vopen[start] = 1
+
+    # unexplored[start] = 0
