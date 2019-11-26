@@ -89,7 +89,7 @@ class World(object):
                             ni.append(j*(num_yaw-1) + k)
             
             # add in number of yaw orientations to waypoint list        
-            ri = wi.transform.rotation
+            ri = wi.rotation
             for k in range(num_yaw):
                 if k == (num_yaw)/2:
                     continue
