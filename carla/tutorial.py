@@ -30,6 +30,7 @@ import networkx as nx
 import matplotlib.pyplot as plt
 from agents.navigation.local_planner import RoadOption
 from agents.tools.misc import vector
+from agents.tools.misc import draw_waypoints
 
 def get_topology(mp):
     """
@@ -139,63 +140,74 @@ def main():
         client = carla.Client('localhost', 2000)
         client.set_timeout(5.0)
 
+        # print('Changing world to Town 7')
+        # client.load_world('Town07') 
+
         # Once we have a client we can retrieve the world that is currently
         # running.
         world = client.get_world()
         mp = world.get_map()
 
-        topology = get_topology(mp)
-        G, id_map, road_id_to_edge = build_graph(topology)
-        # plt.subplot(121)
+        wp = mp.generate_waypoints(5)
+        print(len(wp))
 
-        nx.draw(G) #, with_labels=True, font_weight='bold')
-        # plt.subplot(122)
+        disk_radius = 10
+        num_yaw = 8
+        waypoint_dist = 5
 
-        # nx.draw_shell(G, nlist=[range(5, 10), range(5)], with_labels=True, font_weight='bold')
-        plt.show()
-        plt.savefig("path.png")
+        print(f'creating samples {waypoint_dist}m apart with {num_yaw} yaw vaules and neighbors within {disk_radius}m.')
 
-        # The world contains the list blueprints that we can use for adding new
-        # actors into the simulation.
-        blueprint_library = world.get_blueprint_library()
 
-        # Now let's filter all the blueprints of type 'vehicle' and choose one
-        # at random.
-        vehicle_bp = blueprint_library.filter('model3')[0]
+        waypoints = []
+        neighbors = []
 
-        # Now we need to give an initial transform to the vehicle. We choose a
-        # random transform from the list of recommended spawn points of the map.
-        vehicle_transform = random.choice(world.get_map().get_spawn_points())
+        for i, wi in enumerate(wp):
+            li = wi.transform.location
+            ni = []
+            for j, wj in enumerate(wp):
+                lj = wj.transform.location
+                if li == lj:
+                    continue
+                elif li.distance(lj) <= disk_radius:
+                    for k in range(num_yaw):
+                        if k == (num_yaw)/2:
+                            continue
+                        elif k > (num_yaw)/2:
+                            ni.append(j*(num_yaw-1) + k-1)
+                        else:
+                            ni.append(j*(num_yaw-1) + k)
+            
+            ri = wi.transform.rotation
+            for k in range(num_yaw):
+                if k == (num_yaw)/2:
+                    continue
 
-        # So let's tell the world to spawn the vehicle.
-        vehicle = world.spawn_actor(vehicle_bp, vehicle_transform)
+                neighbors.append(ni)
 
-        # It is important to note that the actors we create won't be destroyed
-        # unless we call their "destroy" function. If we fail to call "destroy"
-        # they will stay in the simulation even after we quit the Python script.
-        # For that reason, we are storing all the actors we create so we can
-        # destroy them afterwards.
-        actor_list.append(vehicle)
-        print('created %s' % vehicle.type_id)
+                theta = ri.yaw + k*360/(num_yaw)
+                if theta >= 180:
+                    theta = theta - 360
+                elif theta <= -180:
+                    theta = 360 - theta
+                waypoints.append([li.x, li.y, theta])
+            break
 
-        # Let's put the vehicle to drive around.
-        vehicle.set_autopilot(True)
+        print(waypoints, neighbors)
+        print(len(waypoints), len(neighbors))
 
-        # Let's add now a "depth" camera attached to the vehicle. Note that the
-        # transform we give here is now relative to the vehicle.
-        # camera_bp = [blueprint_library.find('sensor.camera.rgb'), blueprint_library.find('sensor.lidar.ray_cast')]
-        # camera_transform = [carla.Transform(carla.Location(x=1.5, z=2.4), carla.Rotation(pitch=-15)), carla.Transform(carla.Location(x=1.5, z=2.4))]
-        # for i, sensor in enumerate(camera_bp):
-        #     camera = world.spawn_actor(camera_bp[i], camera_transform[i], attach_to=vehicle)
-        #     actor_list.append(camera)
-        #     print('created %s' % camera.type_id)
-        #     camera.listen(lambda image: image.save_to_disk('_out/%08d' % image.frame_number))
+        # draw_waypoints(world, wp) 
 
-        # Now we register the function that will be called each time the sensor
-        # receives an image. In this example we are saving the image to disk
-        # converting the pixels to gray-scale.
-        # cc = carla.ColorConverter.LogarithmicDepth
-        
+        # spawn vehicle
+        # spawn_points = world.get_map().get_spawn_points()
+        # vehicle_bp = 'model3'
+        # vehicle_transform = spawn_points[0]
+
+        # bp = world.get_blueprint_library().filter(vehicle_bp)[0]
+        # print(bp)
+        # vehicle = world.spawn_actor(bp, vehicle_transform)
+        # print(vehicle)
+        # actor_list.append(vehicle)
+
 
         time.sleep(5)
 

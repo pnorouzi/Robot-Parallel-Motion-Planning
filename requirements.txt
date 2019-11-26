@@ -1,0 +1,4 @@
+numpy
+pycuda
+opencv-python
+networkx
