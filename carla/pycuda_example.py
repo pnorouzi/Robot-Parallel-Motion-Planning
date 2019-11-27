@@ -123,9 +123,8 @@ if __name__ == '__main__':
 
     G_scan = gpuarray.to_gpu(G_indicator)
     exclusiveScan(G_scan)
-    G_scan_cpu = G_scan.get()
-    print('G_scan_cpu: ', G_scan_cpu)
-    gSize = int(G_scan_cpu[-1])
+    print('G_scan: ', G_scan.get())
+    gSize = int(G_scan[-1].get())
 
     np_gSize = np.array([gSize]).astype(np.int32)
     print('np_xgSize: ', np_gSize)
@@ -143,12 +142,10 @@ if __name__ == '__main__':
     ######## scan and compact neighbor set ##################
     x_scan = gpuarray.to_gpu(x_indicator)
     exclusiveScan(x_scan)
-    x_scan_cpu = x_scan.get()
-    print('x_scan_cpu: ', x_scan_cpu)
-    xSize = int(x_scan_cpu[-1])
+    print('x_scan: ', x_scan.get())
+    xSize = int(x_scan[-1].get())
 
     np_xSize = np.array([xSize]).astype(np.int32)
-    print('np_xSize: ', np_xSize)
 
     x = np.zeros(xSize).astype(np.int32)
     compact(drv.InOut(x), x_scan, drv.In(x_indicator), drv.In(waypoints), drv.In(np_xSize), block=(num,1,1), grid=(1,1))
@@ -158,11 +155,10 @@ if __name__ == '__main__':
     y_scan = gpuarray.to_gpu(Vopen)
     exclusiveScan(y_scan)
     y_scan_cpu = y_scan.get()
-    print('y_scan_cpu: ', y_scan_cpu)
-    ySize = int(y_scan_cpu[-1])
+    print('y_scan: ', y_scan.get())
+    ySize = int(y_scan[-1].get())
 
     np_ySize = np.array([ySize]).astype(np.int32)
-    print('np_ySize: ', np_ySize)
 
     y = np.zeros(ySize).astype(np.int32)
     compact(drv.InOut(y), y_scan, drv.In(Vopen), drv.In(waypoints), drv.In(np_ySize), block=(num,1,1), grid=(1,1))
