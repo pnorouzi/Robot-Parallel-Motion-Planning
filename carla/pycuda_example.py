@@ -23,11 +23,8 @@ mod = SourceModule("""
         if(index > n){
             return;
         }
-        if(!G[index]){
-            return;
-        }
         for(int i=0; i < num_neighbors[index]; i++){
-            int j = neighbors[index*neighbors_index[index] + i];
+            int j = neighbors[G[index]*neighbors_index[index] + i];
             x_indicator[j] = Vunexplored[j] || x_indicator[j] > 0 ? 1 : 0;
         }      
     }
@@ -92,6 +89,7 @@ if __name__ == '__main__':
     dubinConnection = mod.get_function("dubinConnection")
 
     ####### INIT #########
+    print('################ INIT ###############')
     states = np.array([[1,2,1], [0,3,3], [0,3,4], [1,2,0], [1,2,2], [0,3,2]]).astype(np.float32)
     waypoints = np.array([0,1,2,3,4,5]).astype(np.int32)
 
@@ -119,13 +117,26 @@ if __name__ == '__main__':
 
     ########## algorithm starts ####################
     ########## Create Wave front ###############
-    G = np.zeros_like(Vopen).astype(np.int32)
-    wavefront(drv.InOut(G), drv.In(Vopen), drv.In(cost), drv.In(threshold), drv.In(n), block=(num,1,1), grid=(1,1))
+    G_indicator = np.zeros_like(Vopen).astype(np.int32)
+    wavefront(drv.InOut(G_indicator), drv.In(Vopen), drv.In(cost), drv.In(threshold), drv.In(n), block=(num,1,1), grid=(1,1))
+    print('G_indicator: ', G_indicator)
+
+    G_scan = gpuarray.to_gpu(G_indicator)
+    exclusiveScan(G_scan)
+    G_scan_cpu = G_scan.get()
+    print('G_scan_cpu: ', G_scan_cpu)
+    gSize = int(G_scan_cpu[-1])
+
+    np_gSize = np.array([gSize]).astype(np.int32)
+    print('np_xgSize: ', np_gSize)
+
+    G = np.zeros(gSize).astype(np.int32)
+    compact(drv.InOut(G), G_scan, drv.In(G_indicator), drv.In(waypoints), drv.In(np_gSize), block=(num,1,1), grid=(1,1))
     print('G: ', G)
 
     ########## creating neighbors of wave front to connect open ###############
     x_indicator = np.zeros_like(waypoints).astype(np.int32)
-    neighborIndicator(drv.InOut(x_indicator), drv.In(G), drv.In(Vunexplored), drv.In(neighbors), drv.In(num_neighbors), neighbors_index, drv.In(n), block=(num,1,1), grid=(1,1))
+    neighborIndicator(drv.InOut(x_indicator), drv.In(G), drv.In(Vunexplored), drv.In(neighbors), drv.In(num_neighbors), neighbors_index, drv.In(np_gSize), block=(gSize,1,1), grid=(1,1))
 
     print('x_indicator: ', x_indicator)
 
