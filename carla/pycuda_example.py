@@ -67,8 +67,9 @@ mod = SourceModule("""
         for(int i=0; i < ySize; i++){
             bool connected = dubinCost(&cost[x[index]], &states[x[index]*3], &states[y[i]*3]);
             parent[x[index]] = connected ? y[i] : parent[x[index]];
-            Vopen[x[index]] = connected;
-            Vunexplored[x[index]] = !connected;
+            Vopen[x[index]] = !connected;
+            Vopen[y[i]] = connected;
+            Vunexplored[x[index]] = connected;
         }
     }
 """)
@@ -160,4 +161,8 @@ if __name__ == '__main__':
     ######### connect neighbors ####################
     # # launch planning
     dubinConnection(drv.InOut(cost), drv.InOut(parent), drv.In(x), drv.In(y), drv.In(states), drv.InOut(Vopen), drv.InOut(Vunexplored), drv.In(np_xSize), drv.In(np_ySize), block=(xSize,1,1), grid=(1,1))
-    print(cost)
+    print('################ post GMT* ###############')
+    print('parents:', parent)
+    print('cost: ', cost)
+    print('Vunexplored: ', Vunexplored)
+    print('Vopen: ', Vopen)
