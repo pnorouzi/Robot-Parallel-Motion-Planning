@@ -61,9 +61,10 @@ mod = SourceModule("""
         for(int i=0; i < ySize; i++){
             bool connected = dubinCost(&cost[x[index]], &states[x[index]*3], &states[y[i]*3]);
             parent[x[index]] = connected ? y[i] : parent[x[index]];
-            Vopen[x[index]] = !connected;
-            Vopen[y[i]] = connected;
-            Vunexplored[x[index]] = connected;
+            cost[x[index]] = connected ? cost[y[i]] + cost[x[index]] : cost[x[index]];
+            Vopen[x[index]] = connected ? 1 : Vopen[x[index]];
+            Vopen[y[i]] = connected ? 0 : Vopen[y[i]];
+            Vunexplored[x[index]] = connected ? 1 : Vunexplored[x[index]];
         }
     }
 """)
@@ -84,7 +85,8 @@ if __name__ == '__main__':
     start = 0
     goal = 5
     n = 6
-    threshold = np.array([1]).astype(np.float32)
+    radius = 6
+    threshold = np.array([radius]).astype(np.float32)
 
     neighbors = np.array([1,2, 0,3, 0,3,4, 1,2,4, 2,3,5, 4]).astype(np.int32)
     print('neighbors: ',neighbors)
@@ -127,47 +129,71 @@ if __name__ == '__main__':
 
     print('################ GMT* ###############')
     ########## algorithm starts ####################
-    ########## Create Wave front ###############
-    dev_Gindicator = cuda.zeros_like(dev_open, dtype=np.int32)
-    wavefront(dev_Gindicator, dev_open, dev_cost, dev_threshold, dev_n, block=(n,1,1), grid=(1,1))
+    i = 0
+    while True:
+        print('######### iteration: ', i)
+        print('parents:', dev_parent.get())
+        print('cost: ', dev_cost.get())
+        print('Vunexplored: ', dev_unexplored.get())
+        print('Vopen: ', dev_open.get())
+        print('threshold: ', dev_threshold)
+        i += 1
 
-    dev_Gscan = cuda.to_gpu(dev_Gindicator)
-    exclusiveScan(dev_Gscan)
-    dev_gSize = dev_Gscan[-1]
-    gSize = int(dev_gSize.get())
+        ########## create Wave front ###############
+        dev_Gindicator = cuda.zeros_like(dev_open, dtype=np.int32)
+        wavefront(dev_Gindicator, dev_open, dev_cost, dev_threshold, dev_n, block=(n,1,1), grid=(1,1))
+        dev_threshold += dev_threshold
+        goal_reached = dev_Gindicator[goal].get() == 1
 
-    dev_G = cuda.zeros(dev_gSize, dtype=np.int32)
-    compact(dev_G, dev_Gscan, dev_Gindicator, dev_waypoints, dev_gSize, block=(n,1,1), grid=(1,1))
-    print('G: ', dev_G.get())
+        ######### scan and compact open set to connect neighbors ###############
+        dev_yscan = cuda.to_gpu(dev_open)
+        exclusiveScan(dev_yscan)
+        dev_ySize = dev_yscan[-1]
+        ySize = int(dev_ySize.get())
 
-    ########## creating neighbors of wave front to connect open ###############
-    dev_xindicator = cuda.zeros_like(dev_open, dtype=np.int32)
-    neighborIndicator(dev_xindicator, dev_G, dev_unexplored, dev_neighbors, dev_num_neighbors, neighbors_index, dev_gSize, block=(gSize,1,1), grid=(1,1))
+        dev_y = cuda.zeros(ySize, dtype=np.int32)
+        compact(dev_y, dev_yscan, dev_open, dev_waypoints, dev_ySize, block=(n,1,1), grid=(1,1))
+        
+        dev_Gscan = cuda.to_gpu(dev_Gindicator)
+        exclusiveScan(dev_Gscan)
+        dev_gSize = dev_Gscan[-1]
+        gSize = int(dev_gSize.get())
 
-    dev_xscan = cuda.to_gpu(dev_xindicator)
-    exclusiveScan(dev_xscan)
-    dev_xSize = dev_xscan[-1]
-    xSize = int(dev_xSize.get())
+        print('goal reached: ', goal_reached)
+        print('y size: ', ySize, 'y: ' , dev_y.get())
+        print('G size: ', gSize, 'G: ', dev_Gindicator.get())
 
-    dev_x = cuda.zeros(dev_xSize, dtype=np.int32)
-    compact(dev_x, dev_xscan, dev_xindicator, dev_waypoints, dev_xSize, block=(n,1,1), grid=(1,1))
-    print('x: ', dev_x.get())
+        if ySize == 0 or i == 5:
+            print('### empty open set ###')
+            break
+        elif goal_reached:
+            print('### goal reached ###')
+            break
+        elif gSize == 0:
+            print('### threshold skip')
+            continue
 
-    ######### scan and compact open set to connect neighbors ###############
-    dev_yscan = cuda.to_gpu(dev_open)
-    exclusiveScan(dev_yscan)
-    dev_ySize = dev_yscan[-1]
-    ySize = int(dev_ySize.get())
+        dev_G = cuda.zeros(gSize, dtype=np.int32)
+        compact(dev_G, dev_Gscan, dev_Gindicator, dev_waypoints, dev_gSize, block=(n,1,1), grid=(1,1))
+        
 
-    dev_y = cuda.zeros(dev_ySize, dtype=np.int32)
-    compact(dev_y, dev_yscan, dev_open, dev_waypoints, dev_ySize, block=(n,1,1), grid=(1,1))
-    print('y: ', dev_y.get())
+        ########## creating neighbors of wave front to connect open ###############
+        dev_xindicator = cuda.zeros_like(dev_open, dtype=np.int32)
+        neighborIndicator(dev_xindicator, dev_G, dev_unexplored, dev_neighbors, dev_num_neighbors, neighbors_index, dev_gSize, block=(gSize,1,1), grid=(1,1))
 
-    ######### connect neighbors ####################
-    # # launch planning
-    dubinConnection(dev_cost, dev_parent, dev_x, dev_y, dev_states, dev_open, dev_unexplored, dev_xSize, dev_ySize, block=(xSize,1,1), grid=(1,1))
-    print('################ post GMT* ###############')
-    print('parents:', dev_parent.get())
-    print('cost: ', dev_cost.get())
-    print('Vunexplored: ', dev_unexplored.get())
-    print('Vopen: ', dev_open.get())
+        dev_xscan = cuda.to_gpu(dev_xindicator)
+        exclusiveScan(dev_xscan)
+        dev_xSize = dev_xscan[-1]
+        xSize = int(dev_xSize.get())
+
+        if xSize == 0:
+            print('### x skip')
+            continue
+
+        dev_x = cuda.zeros(xSize, dtype=np.int32)
+        compact(dev_x, dev_xscan, dev_xindicator, dev_waypoints, dev_xSize, block=(n,1,1), grid=(1,1))
+        print('x size: ', xSize, 'x: ', dev_x.get())
+
+        ######### connect neighbors ####################
+        # # launch planning
+        dubinConnection(dev_cost, dev_parent, dev_x, dev_y, dev_states, dev_open, dev_unexplored, dev_xSize, dev_ySize, block=(xSize,1,1), grid=(1,1))
