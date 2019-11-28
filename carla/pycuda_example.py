@@ -131,7 +131,7 @@ if __name__ == '__main__':
     dev_Gindicator = cuda.zeros_like(dev_open, dtype=np.int32)
     wavefront(dev_Gindicator, dev_open, dev_cost, dev_threshold, dev_n, block=(n,1,1), grid=(1,1))
 
-    dev_Gscan = cuda.zeros_like(dev_Gindicator, dtype=np.int32)
+    dev_Gscan = cuda.to_gpu(dev_Gindicator)
     exclusiveScan(dev_Gscan)
     dev_gSize = dev_Gscan[-1]
     gSize = int(dev_gSize.get())
@@ -144,8 +144,7 @@ if __name__ == '__main__':
     dev_xindicator = cuda.zeros_like(dev_open, dtype=np.int32)
     neighborIndicator(dev_xindicator, dev_G, dev_unexplored, dev_neighbors, dev_num_neighbors, neighbors_index, dev_gSize, block=(gSize,1,1), grid=(1,1))
 
-
-    dev_xscan = cuda.zeros_like(dev_xindicator, dtype=np.int32)
+    dev_xscan = cuda.to_gpu(dev_xindicator)
     exclusiveScan(dev_xscan)
     dev_xSize = dev_xscan[-1]
     xSize = int(dev_xSize.get())
@@ -155,7 +154,7 @@ if __name__ == '__main__':
     print('x: ', dev_x.get())
 
     ######### scan and compact open set to connect neighbors ###############
-    dev_yscan = dev_open
+    dev_yscan = cuda.to_gpu(dev_open)
     exclusiveScan(dev_yscan)
     dev_ySize = dev_yscan[-1]
     ySize = int(dev_ySize.get())
