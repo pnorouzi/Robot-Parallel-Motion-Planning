@@ -12,36 +12,25 @@ import numpy as np
 '''
 
 mod = SourceModule("""
-    __global__ void neighborIndicator(int *x_indicator, int *G, int *Vunexplored, int *neighbors, int *num_neighbors, int *neighbors_index, const int n){
-        const int index = threadIdx.x;
-        if(index > n){
-            return;
-        }
-
-        for(int i=0; i < num_neighbors[index]; i++){
-            int j = neighbors[G[index]*neighbors_index[index] + i];
-            x_indicator[j] = Vunexplored[j] || x_indicator[j] > 0 ? 1 : 0;
-        }      
-    }
-
-    __global__ void wavefront(int *G, int *Vopen, float *cost, float threshold, const int n){
+    __global__ void wavefront(int *G, int *open, float *cost, float threshold, const int n){
         const int index = threadIdx.x;
         if(index > n){
             return;
         }
         
-        G[index] =  Vopen[index] && cost[index] <= threshold ? 1 : 0;
+        G[index] =  open[index] && cost[index] <= threshold ? 1 : 0;
     }
 
-    __global__ void compact(int *x, int *x_scan, int *x_indicator, int *waypoints, const int n){
+    __global__ void neighborIndicator(int *x_indicator, int *G, int *unexplored, int *neighbors, int *num_neighbors, int *neighbors_index, const int n){
         const int index = threadIdx.x;
         if(index > n){
             return;
         }
 
-        if(x_indicator[index] == 1){
-            x[x_scan[index]] = waypoints[index];
-        }
+        for(int i=0; i < num_neighbors[G[index]]; i++){
+            int j = neighbors[neighbors_index[G[index]] + i];
+            x_indicator[j] = unexplored[j] || x_indicator[j] > 0 ? 1 : 0;
+        }      
     }
 
     __device__ bool dubinCost(float *cost, float *x, float *y){
@@ -52,7 +41,7 @@ mod = SourceModule("""
 
     }
 
-    __global__ void dubinConnection(float *cost, int *parent, int *x, int *y, float *states, int *Vopen, int *Vunexplored, const int xSize, const int ySize){
+    __global__ void dubinConnection(float *cost, int *parent, int *x, int *y, float *states, int *open, int *unexplored, const int xSize, const int ySize){
         const int index = threadIdx.x;
         if(index > xSize){
             return;
@@ -62,9 +51,20 @@ mod = SourceModule("""
             bool connected = dubinCost(&cost[x[index]], &states[x[index]*3], &states[y[i]*3]);
             parent[x[index]] = connected ? y[i] : parent[x[index]];
             cost[x[index]] = connected ? cost[y[i]] + cost[x[index]] : cost[x[index]];
-            Vopen[x[index]] = connected ? 1 : Vopen[x[index]];
-            Vopen[y[i]] = connected ? 0 : Vopen[y[i]];
-            Vunexplored[x[index]] = connected ? 1 : Vunexplored[x[index]];
+            open[x[index]] = connected ? 1 : open[x[index]];
+            open[y[i]] = connected ? 0 : open[y[i]];
+            unexplored[x[index]] = connected ? 1 : unexplored[x[index]];
+        }
+    }
+
+    __global__ void compact(int *x, int *scan, int *indicator, int *waypoints, const int n){
+        const int index = threadIdx.x;
+        if(index > n){
+            return;
+        }
+
+        if(indicator[index] == 1){
+            x[scan[index]] = waypoints[index];
         }
     }
 """)
