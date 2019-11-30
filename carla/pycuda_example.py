@@ -12,13 +12,13 @@ import numpy as np
 '''
 
 mod = SourceModule("""
-    __global__ void wavefront(int *G, int *open, float *cost, float threshold, const int n){
+    __global__ void wavefront(int *G, int *open, float *cost, float *threshold, const int n){
         const int index = threadIdx.x;
         if(index > n){
             return;
         }
         
-        G[index] =  open[index] && cost[index] <= threshold ? 1 : 0;
+        G[index] = open[index] && cost[index] <= threshold[0] ? 1 : 0;
     }
 
     __global__ void neighborIndicator(int *x_indicator, int *G, int *unexplored, int *neighbors, int *num_neighbors, int *neighbors_index, const int n){
@@ -33,27 +33,27 @@ mod = SourceModule("""
         }      
     }
 
-    __device__ bool dubinCost(float *cost, float *x, float *y){
+    __device__ bool dubinCost(float &cost, float *x, float *y){
         float new_cost = powf(x[0]-y[0],2) + powf(x[1]-y[1],2) + powf(x[2]-y[2],2);
-        bool connected = new_cost < *cost;
-        *cost = connected ? new_cost : *cost;
+        bool connected = new_cost < cost;
+        cost = connected ? new_cost : cost;
         return connected;
 
     }
 
-    __global__ void dubinConnection(float *cost, int *parent, int *x, int *y, float *states, int *open, int *unexplored, const int xSize, const int ySize){
+    __global__ void dubinConnection(float *cost, int *parent, int *x, int *y, float *states, int *open, int *unexplored, const int xSize, const int *ySize){
         const int index = threadIdx.x;
         if(index > xSize){
             return;
         }
 
-        for(int i=0; i < ySize; i++){
-            bool connected = dubinCost(&cost[x[index]], &states[x[index]*3], &states[y[i]*3]);
-            parent[x[index]] = connected ? y[i] : parent[x[index]];
+        for(int i=0; i < ySize[0]; i++){
+            bool connected = dubinCost(cost[x[index]], &states[x[index]*3], &states[y[i]*3]);
+            parent[x[index]] = connected ? y[i]: parent[x[index]];
             cost[x[index]] = connected ? cost[y[i]] + cost[x[index]] : cost[x[index]];
             open[x[index]] = connected ? 1 : open[x[index]];
             open[y[i]] = connected ? 0 : open[y[i]];
-            unexplored[x[index]] = connected ? 1 : unexplored[x[index]];
+            unexplored[x[index]] = connected ? 0 : unexplored[x[index]];
         }
     }
 
@@ -119,6 +119,7 @@ if __name__ == '__main__':
     dev_num_neighbors = cuda.to_gpu(num_neighbors)
     neighbors_index = cuda.to_gpu(num_neighbors)
     exclusiveScan(neighbors_index)
+    print('neighbors index: ', neighbors_index)
 
     dev_parent = cuda.to_gpu(parent)
     
@@ -148,7 +149,7 @@ if __name__ == '__main__':
         ######### scan and compact open set to connect neighbors ###############
         dev_yscan = cuda.to_gpu(dev_open)
         exclusiveScan(dev_yscan)
-        dev_ySize = dev_yscan[-1]
+        dev_ySize = dev_yscan[-1] + dev_open[-1]
         ySize = int(dev_ySize.get())
 
         dev_y = cuda.zeros(ySize, dtype=np.int32)
@@ -156,7 +157,7 @@ if __name__ == '__main__':
         
         dev_Gscan = cuda.to_gpu(dev_Gindicator)
         exclusiveScan(dev_Gscan)
-        dev_gSize = dev_Gscan[-1]
+        dev_gSize = dev_Gscan[-1] + dev_Gindicator[-1]
         gSize = int(dev_gSize.get())
 
         print('goal reached: ', goal_reached)
@@ -183,7 +184,7 @@ if __name__ == '__main__':
 
         dev_xscan = cuda.to_gpu(dev_xindicator)
         exclusiveScan(dev_xscan)
-        dev_xSize = dev_xscan[-1]
+        dev_xSize = dev_xscan[-1] + dev_xindicator[-1]
         xSize = int(dev_xSize.get())
 
         if xSize == 0:
