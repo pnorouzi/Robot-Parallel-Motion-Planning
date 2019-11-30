@@ -132,10 +132,10 @@ if __name__ == '__main__':
     i = 0
     while True:
         print('######### iteration: ', i)
-        print('parents:', dev_parent.get())
-        print('cost: ', dev_cost.get())
-        print('Vunexplored: ', dev_unexplored.get())
-        print('Vopen: ', dev_open.get())
+        print('parents:', dev_parent)
+        print('cost: ', dev_cost)
+        print('Vunexplored: ', dev_unexplored)
+        print('Vopen: ', dev_open)
         print('threshold: ', dev_threshold)
         i += 1
 
@@ -160,8 +160,8 @@ if __name__ == '__main__':
         gSize = int(dev_gSize.get())
 
         print('goal reached: ', goal_reached)
-        print('y size: ', ySize, 'y: ' , dev_y.get())
-        print('G size: ', gSize, 'G: ', dev_Gindicator.get())
+        print('y size: ', ySize, 'y: ' , dev_y)
+        print('G size: ', gSize, 'G: ', dev_Gindicator)
 
         if ySize == 0 or i == 5:
             print('### empty open set ###')
@@ -192,7 +192,7 @@ if __name__ == '__main__':
 
         dev_x = cuda.zeros(xSize, dtype=np.int32)
         compact(dev_x, dev_xscan, dev_xindicator, dev_waypoints, dev_xSize, block=(n,1,1), grid=(1,1))
-        print('x size: ', xSize, 'x: ', dev_x.get())
+        print('x size: ', xSize, 'x: ', dev_x)
 
         ######### connect neighbors ####################
         # # launch planning
