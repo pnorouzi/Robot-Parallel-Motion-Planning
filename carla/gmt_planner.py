@@ -18,7 +18,7 @@ mod = SourceModule("""
                 if (obstacles[obs*4 +3]<=y_vals[i] && obstacles[obs*4 +1]>=y_vals[i]) {
                     if (obstacles[obs*4]<=x_vals[i] && obstacles[obs*4 + 2]>=x_vals[i]){
                         return true;
-                      }
+                    }
                 }
             }
         }
