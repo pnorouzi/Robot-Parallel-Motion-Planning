@@ -31,9 +31,9 @@ from cuda_agent import *
 from environment import *
 
 DEBUG = False
-NUM_OBSTACLES = 25
-SPAWN_POINT_INDICES = [116,198,116]
-AGENT = 'basic'
+NUM_OBSTACLES = 0
+SPAWN_POINT_INDICES = [116,198]
+AGENT = 'cuda'
 
 
 def game_loop(options_dict):
@@ -69,6 +69,7 @@ def game_loop(options_dict):
 
         print(f'Going to {destination_transform}.')
         agent.set_destination((destination_point.x, destination_point.y, destination_point.z))
+        agent.create_samples(vehicle_transform, destination_transform)
         
         # attach sensors to vehicle
         sensor_bp = ['sensor.camera.rgb', "sensor.camera.semantic_segmentation", "sensor.camera.depth"]
@@ -79,7 +80,6 @@ def game_loop(options_dict):
 
         # add obstacles and get sample nodes
         world.create_obstacles(options_dict['num_obstacles'])
-        world.create_samples(vehicle_transform, destination_transform)
 
         # run the simulation
         prev_location = vehicle.vehicle.get_location()
