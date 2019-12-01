@@ -116,8 +116,9 @@ class CudaAgent(Agent):
         # gmt(self._vehicle.get_location(), self.end_waypoint, obstacle_list)
         # waypoint = world.map.get_waypoint(world.player.get_location(), project_to_road=True, lane_type=(carla.LaneType.Driving | carla.LaneType.Shoulder | carla.LaneType.Sidewalk))
     
-        self.obstacles = np.array(self.obstacle_list)
-        iter_parameters = {'start':self.start, 'goal':self.goal, 'radius':self.radius, 'obstacles':self.obstacles}
+        self.obstacles = obstacles = np.array([[5,4,7,3]]).astype(np.float32)
+
+        iter_parameters = {'start':self.start, 'goal':self.goal, 'radius':self.radius, 'threshold':self.threshold, 'obstacles':self.obstacles}
         route = self.gmt_planner.run_step(iter_parameters, debug=debug)
         if debug:
             print('route: ', route)
@@ -133,6 +134,7 @@ class CudaAgent(Agent):
         self.current_speed = get_speed(self._vehicle)
 
         self.radius = 4
+        self.threshold  = 10
 
         route = self._trace_route(debug) # get plan
         if len(route) == 0:
@@ -146,4 +148,5 @@ class CudaAgent(Agent):
         control = self._vehicle_controller.run_step(self._target_speed, self.current_speed, waypoint, self.current_location) # execute first step of plan
 
         if debug: # draw plan
+            print('control: ', control)
             draw_waypoints(self._vehicle.get_world(), route, self._vehicle.get_location().z + 1.0)

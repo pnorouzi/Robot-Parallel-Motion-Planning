@@ -30,7 +30,7 @@ from agents.navigation.basic_agent import BasicAgent
 from cuda_agent import *
 from environment import *
 
-DEBUG = False
+DEBUG = True
 NUM_OBSTACLES = 0
 SPAWN_POINT_INDICES = [116,198]
 AGENT = 'cuda'

@@ -431,7 +431,7 @@ mod = SourceModule("""
     }
 
     __global__ void dubinConnection(float *cost, int *parent, int *x, int *y, float *states, int *open, int *unexplored, const int xSize, const int *ySize, float *obstacles, int *num_obs, float *radius){
-        const int index = threadIdx.x;
+        const int index = threadIdx.x + (blockIdx.x * blockDim.x);
         if(index > xSize){
             return;
         }
@@ -447,7 +447,7 @@ mod = SourceModule("""
     }
 
     __global__ void wavefront(int *G, int *open, float *cost, float *threshold, const int n){
-        const int index = threadIdx.x;
+        const int index = threadIdx.x + (blockIdx.x * blockDim.x);
         if(index > n){
             return;
         }
@@ -456,7 +456,7 @@ mod = SourceModule("""
     }
 
     __global__ void neighborIndicator(int *x_indicator, int *G, int *unexplored, int *neighbors, int *num_neighbors, int *neighbors_index, const int n){
-        const int index = threadIdx.x;
+        const int index = threadIdx.x + (blockIdx.x * blockDim.x);
         if(index > n){
             return;
         }
@@ -468,7 +468,7 @@ mod = SourceModule("""
     }
 
     __global__ void compact(int *x, int *scan, int *indicator, int *waypoints, const int n){
-        const int index = threadIdx.x;
+        const int index = threadIdx.x + (blockIdx.x * blockDim.x);
         if(index > n){
             return;
         }
@@ -535,7 +535,7 @@ class GMT(object):
         self.start = iter_parameters['start']
         self.goal = iter_parameters['goal']
         self.radius = iter_parameters['radius']
-        self.threshold = np.array([self.radius]).astype(np.float32)
+        self.threshold = np.array([ iter_parameters['threshold'] ]).astype(np.float32)
 
 
         self.cost[self.start] = 0
@@ -568,7 +568,7 @@ class GMT(object):
 
         # del self.route[-1]
 
-    def run_step(self, iter_parameters, iter_limit=10000, debug=False):
+    def run_step(self, iter_parameters, iter_limit=1000, debug=False):
         self.step_init(iter_parameters,debug)
 
         goal_reached = False
@@ -613,12 +613,11 @@ class GMT(object):
                 self.get_path()
                 return self.route
             elif gSize == 0:
-                print('### threshold skip')
+                # print('### threshold skip')
                 continue
 
             dev_G = cuda.zeros(gSize, dtype=np.int32)
-            compact(dev_G, dev_Gscan, dev_Gindicator, self.dev_waypoints, dev_gSize, block=(threadsPerBlock,1,1), grid=(nBlocksPerGrid,1))
-            
+            compact(dev_G, dev_Gscan, dev_Gindicator, self.dev_waypoints, dev_gSize, block=(threadsPerBlock,1,1), grid=(nBlocksPerGrid,1))     
 
             ########## creating neighbors of wave front to connect open ###############
             dev_xindicator = cuda.zeros_like(self.dev_open, dtype=np.int32)
@@ -644,11 +643,11 @@ class GMT(object):
 
             if debug:
                 print('######### iteration: ', iteration)
-                print('parents:', self.dev_parent)
-                print('cost: ', self.dev_cost)
-                print('Vunexplored: ', self.dev_unexplored)
-                print('Vopen: ', self.dev_open)
-                print('threshold: ', self.dev_threshold)
+                print('dev parents:', self.dev_parent)
+                print('dev cost: ', self.dev_cost)
+                print('dev unexplored: ', self.dev_unexplored)
+                print('dev open: ', self.dev_open)
+                print('dev threshold: ', self.dev_threshold)
 
                 print('goal reached: ', goal_reached)
                 print('y size: ', ySize, 'y: ' , dev_y)

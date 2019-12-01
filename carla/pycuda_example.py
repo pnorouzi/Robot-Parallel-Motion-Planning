@@ -6,6 +6,7 @@ import pycuda.gpuarray as cuda
 from pycuda.compiler import SourceModule
 
 import numpy as np
+import math
 
 ''''
 
@@ -430,7 +431,7 @@ mod = SourceModule("""
     }
 
     __global__ void dubinConnection(float *cost, int *parent, int *x, int *y, float *states, int *open, int *unexplored, const int xSize, const int *ySize, float *obstacles, int *num_obs, float *radius){
-        const int index = threadIdx.x;
+        const int index = threadIdx.x + (blockIdx.x * blockDim.x);
         if(index > xSize){
             return;
         }
@@ -446,7 +447,7 @@ mod = SourceModule("""
     }
 
     __global__ void wavefront(int *G, int *open, float *cost, float *threshold, const int n){
-        const int index = threadIdx.x;
+        const int index = threadIdx.x + (blockIdx.x * blockDim.x);
         if(index > n){
             return;
         }
@@ -455,7 +456,7 @@ mod = SourceModule("""
     }
 
     __global__ void neighborIndicator(int *x_indicator, int *G, int *unexplored, int *neighbors, int *num_neighbors, int *neighbors_index, const int n){
-        const int index = threadIdx.x;
+        const int index = threadIdx.x + (blockIdx.x * blockDim.x);
         if(index > n){
             return;
         }
@@ -467,7 +468,7 @@ mod = SourceModule("""
     }
 
     __global__ void compact(int *x, int *scan, int *indicator, int *waypoints, const int n){
-        const int index = threadIdx.x;
+        const int index = threadIdx.x + (blockIdx.x * blockDim.x);
         if(index > n){
             return;
         }
@@ -572,12 +573,15 @@ class GMT(object):
 
         goal_reached = False
         iteration = 0
+        threadsPerBlock = 128
         while True:
             iteration += 1
 
             ########## create Wave front ###############
             dev_Gindicator = cuda.zeros_like(self.dev_open, dtype=np.int32)
-            wavefront(dev_Gindicator, self.dev_open, self.dev_cost, self.dev_threshold, self.dev_n, block=(self.n,1,1), grid=(1,1))
+
+            nBlocksPerGrid = int(math.ceil((self.n + threadsPerBlock - 1) / threadsPerBlock))
+            wavefront(dev_Gindicator, self.dev_open, self.dev_cost, self.dev_threshold, self.dev_n, block=(threadsPerBlock,1,1), grid=(nBlocksPerGrid,1))
             self.dev_threshold += self.dev_threshold
             goal_reached = dev_Gindicator[self.goal].get() == 1
 
@@ -588,7 +592,7 @@ class GMT(object):
             ySize = int(dev_ySize.get())
 
             dev_y = cuda.zeros(ySize, dtype=np.int32)
-            compact(dev_y, dev_yscan, self.dev_open, self.dev_waypoints, dev_ySize, block=(self.n,1,1), grid=(1,1))
+            compact(dev_y, dev_yscan, self.dev_open, self.dev_waypoints, dev_ySize, block=(threadsPerBlock,1,1), grid=(nBlocksPerGrid,1))
             
             dev_Gscan = cuda.to_gpu(dev_Gindicator)
             exclusiveScan(dev_Gscan)
@@ -597,11 +601,11 @@ class GMT(object):
 
             if ySize == 0:
                 print('### empty open set ###')
-                del self.route[-1]
+                # del self.route[-1]
                 return self.route
             elif iteration >= iter_limit:
                 print('### iteration limit ###')
-                del self.route[-1]
+                # del self.route[-1]
                 return self.route
             elif goal_reached:
                 print('### goal reached ###')
@@ -609,16 +613,16 @@ class GMT(object):
                 self.get_path()
                 return self.route
             elif gSize == 0:
-                print('### threshold skip')
+                # print('### threshold skip')
                 continue
 
             dev_G = cuda.zeros(gSize, dtype=np.int32)
-            compact(dev_G, dev_Gscan, dev_Gindicator, self.dev_waypoints, dev_gSize, block=(self.n,1,1), grid=(1,1))
-            
+            compact(dev_G, dev_Gscan, dev_Gindicator, self.dev_waypoints, dev_gSize, block=(threadsPerBlock,1,1), grid=(nBlocksPerGrid,1))     
 
             ########## creating neighbors of wave front to connect open ###############
             dev_xindicator = cuda.zeros_like(self.dev_open, dtype=np.int32)
-            neighborIndicator(dev_xindicator, dev_G, self.dev_unexplored, self.dev_neighbors, self.dev_num_neighbors, self.neighbors_index, dev_gSize, block=(gSize,1,1), grid=(1,1))
+            gBlocksPerGrid = int(math.ceil((gSize + threadsPerBlock - 1) / threadsPerBlock))
+            neighborIndicator(dev_xindicator, dev_G, self.dev_unexplored, self.dev_neighbors, self.dev_num_neighbors, self.neighbors_index, dev_gSize, block=(threadsPerBlock,1,1), grid=(gBlocksPerGrid,1))
 
             dev_xscan = cuda.to_gpu(dev_xindicator)
             exclusiveScan(dev_xscan)
@@ -630,19 +634,20 @@ class GMT(object):
                 continue
 
             dev_x = cuda.zeros(xSize, dtype=np.int32)
-            compact(dev_x, dev_xscan, dev_xindicator, self.dev_waypoints, dev_xSize, block=(self.n,1,1), grid=(1,1))
+            compact(dev_x, dev_xscan, dev_xindicator, self.dev_waypoints, dev_xSize, block=(threadsPerBlock,1,1), grid=(nBlocksPerGrid,1))
 
             ######### connect neighbors ####################
             # # launch planning
-            dubinConnection(self.dev_cost, self.dev_parent, dev_x, dev_y, self.dev_states, self.dev_open, self.dev_unexplored, dev_xSize, dev_ySize, self.dev_obstacles, self.dev_num_obs, self.dev_radius, block=(xSize,1,1), grid=(1,1))
+            xBlocksPerGrid = int(math.ceil((xSize + threadsPerBlock - 1) / threadsPerBlock))
+            dubinConnection(self.dev_cost, self.dev_parent, dev_x, dev_y, self.dev_states, self.dev_open, self.dev_unexplored, dev_xSize, dev_ySize, self.dev_obstacles, self.dev_num_obs, self.dev_radius, block=(threadsPerBlock,1,1), grid=(xBlocksPerGrid,1))
 
             if debug:
                 print('######### iteration: ', iteration)
-                print('parents:', self.dev_parent)
-                print('cost: ', self.dev_cost)
-                print('Vunexplored: ', self.dev_unexplored)
-                print('Vopen: ', self.dev_open)
-                print('threshold: ', self.dev_threshold)
+                print('dev parents:', self.dev_parent)
+                print('dev cost: ', self.dev_cost)
+                print('dev unexplored: ', self.dev_unexplored)
+                print('dev open: ', self.dev_open)
+                print('dev threshold: ', self.dev_threshold)
 
                 print('goal reached: ', goal_reached)
                 print('y size: ', ySize, 'y: ' , dev_y)
