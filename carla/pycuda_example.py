@@ -432,7 +432,7 @@ mod = SourceModule("""
 
     __global__ void dubinConnection(float *cost, int *parent, int *x, int *y, float *states, int *open, int *unexplored, const int xSize, const int *ySize, float *obstacles, int *num_obs, float *radius){
         const int index = threadIdx.x + (blockIdx.x * blockDim.x);
-        if(index > xSize){
+        if(index >= xSize){
             return;
         }
 
@@ -448,7 +448,7 @@ mod = SourceModule("""
 
     __global__ void wavefront(int *G, int *open, float *cost, float *threshold, const int n){
         const int index = threadIdx.x + (blockIdx.x * blockDim.x);
-        if(index > n){
+        if(index >= n){
             return;
         }
         
@@ -457,7 +457,7 @@ mod = SourceModule("""
 
     __global__ void neighborIndicator(int *x_indicator, int *G, int *unexplored, int *neighbors, int *num_neighbors, int *neighbors_index, const int n){
         const int index = threadIdx.x + (blockIdx.x * blockDim.x);
-        if(index > n){
+        if(index >= n){
             return;
         }
 
@@ -469,7 +469,7 @@ mod = SourceModule("""
 
     __global__ void compact(int *x, int *scan, int *indicator, int *waypoints, const int n){
         const int index = threadIdx.x + (blockIdx.x * blockDim.x);
-        if(index > n){
+        if(index >= n){
             return;
         }
 
@@ -580,7 +580,8 @@ class GMT(object):
             ########## create Wave front ###############
             dev_Gindicator = cuda.zeros_like(self.dev_open, dtype=np.int32)
 
-            nBlocksPerGrid = int(math.ceil((self.n + threadsPerBlock - 1) / threadsPerBlock))
+            nBlocksPerGrid = int(((self.n + threadsPerBlock - 1) / threadsPerBlock))
+            print(nBlocksPerGrid)
             wavefront(dev_Gindicator, self.dev_open, self.dev_cost, self.dev_threshold, self.dev_n, block=(threadsPerBlock,1,1), grid=(nBlocksPerGrid,1))
             self.dev_threshold += self.dev_threshold
             goal_reached = dev_Gindicator[self.goal].get() == 1
@@ -621,7 +622,7 @@ class GMT(object):
 
             ########## creating neighbors of wave front to connect open ###############
             dev_xindicator = cuda.zeros_like(self.dev_open, dtype=np.int32)
-            gBlocksPerGrid = int(math.ceil((gSize + threadsPerBlock - 1) / threadsPerBlock))
+            gBlocksPerGrid = int(((gSize + threadsPerBlock - 1) / threadsPerBlock))
             neighborIndicator(dev_xindicator, dev_G, self.dev_unexplored, self.dev_neighbors, self.dev_num_neighbors, self.neighbors_index, dev_gSize, block=(threadsPerBlock,1,1), grid=(gBlocksPerGrid,1))
 
             dev_xscan = cuda.to_gpu(dev_xindicator)
@@ -638,7 +639,7 @@ class GMT(object):
 
             ######### connect neighbors ####################
             # # launch planning
-            xBlocksPerGrid = int(math.ceil((xSize + threadsPerBlock - 1) / threadsPerBlock))
+            xBlocksPerGrid = int(((xSize + threadsPerBlock - 1) / threadsPerBlock))
             dubinConnection(self.dev_cost, self.dev_parent, dev_x, dev_y, self.dev_states, self.dev_open, self.dev_unexplored, dev_xSize, dev_ySize, self.dev_obstacles, self.dev_num_obs, self.dev_radius, block=(threadsPerBlock,1,1), grid=(xBlocksPerGrid,1))
 
             if debug:
