@@ -14,19 +14,20 @@ import math
 
 mod = SourceModule("""
     __device__ bool check_col(float *y_vals,float *x_vals,float *obstacles, int num_obs){
-
         for (int obs=0;obs<num_obs;obs++){
             for (int i=0;i<150;i++){
-                if ((obstacles[obs*4 +3]<=y_vals[i] || obstacles[obs*4 +1]>=y_vals[i]) && (obstacles[obs*4]<=x_vals[i] || obstacles[obs*4 + 2]>=x_vals[i])){
-                return false;
+                if (obstacles[obs*4 +3]<=y_vals[i] && obstacles[obs*4 +1]>=y_vals[i]) {
+                    if (obstacles[obs*4]<=x_vals[i] && obstacles[obs*4 + 2]>=x_vals[i]){
+                        return true;
+                    }
                 }
             }
         }
         return false;
     }
 
-    __device__ void RSRcost(float *curCost, float *point1,float *point2, float r_min, float *obstacles, int num_obs){
-        float PI = 3.1415926535;
+    __device__ void RSRcost(float *curCost, float *point1,float *point2, int r_min, float *obstacles, int num_obs){
+        float PI = 3.141592653589793;
 
         float p_c1 [2] = { point1[0] + (r_min * cosf(point1[2] - PI/2)), point1[1] + (r_min * sinf(point1[2] - PI/2))}; 
         float p_c2 [2] = { point2[0] + (r_min * cosf(point2[2] - PI/2)), point2[1] + (r_min * sinf(point2[2] - PI/2))};
@@ -53,7 +54,6 @@ mod = SourceModule("""
 
         float V2 [2] = {tangent_2[0]-tangent_1[0],tangent_2[1]-tangent_1[1]};
 
-
         float p2_h [2] = {point1[0], point1[1]};
         float v1 [2] = {p2_h[0]-p_c1[0], p2_h[1]-p_c1[1]};
         float v2 [2] = {tangent_1[0]-p_c1[0], tangent_1[1]-p_c1[1]};
@@ -68,13 +68,12 @@ mod = SourceModule("""
 
         float x_vals [150] = { };
         float y_vals [150] = { };
-        float d_theta = theta_1/50;
+        float d_theta = theta_1/49;
 
         for (int i=0;i<50;i++){
             x_vals[i] = (abs(r_1) * cosf(angle+(i*d_theta))) + p_c1[0];
             y_vals[i] = (abs(r_1) * sinf(angle+(i*d_theta))) + p_c1[1];
         }
-
 
         float p3_h [2] = {point2[0], point2[1]};
         v1[0] = tangent_2[0]-p_c2[0];
@@ -85,21 +84,22 @@ mod = SourceModule("""
 
         float theta_2 = atan2f(v2[1],v2[0]) - atan2f(v1[1],v1[0]);
 
+
         if (theta_2>0){
             theta_2-=(PI*2);
         }
 
         angle = atan2f((tangent_2[1]-p_c2[1]),(tangent_2[0]-p_c2[0]));
 
-        d_theta = theta_2/50;
+        d_theta = theta_2/49;
 
         for (int i=0;i<50;i++){
             x_vals[i+100] = (abs(r_2) * cosf(angle+(i*d_theta))) + p_c2[0];
             y_vals[i+100] = (abs(r_2) * sinf(angle+(i*d_theta))) + p_c2[1];
         }
 
-        float d_x = (x_vals[99] - x_vals[49])/50;
-        float d_y = (y_vals[99] - y_vals[49])/50;
+        float d_x = (x_vals[100] - x_vals[49])/49;
+        float d_y = (y_vals[100] - y_vals[49])/49;
 
         for (int i=0;i<50;i++){
             x_vals[i+50] = x_vals[49] + (i*d_x);
@@ -110,11 +110,9 @@ mod = SourceModule("""
 
         bool collision = check_col(y_vals,x_vals,obstacles,num_obs);
 
-
         if (collision){
             return;
         }
-
 
         float cost = abs((r_1*theta_1)) + abs((r_2*theta_2)) + sqrtf(powf(V2[0],2) + powf(V2[1],2));
 
@@ -126,8 +124,8 @@ mod = SourceModule("""
         return;
     }
 
-    __device__ void LSLcost(float *curCost, float *point1,float *point2, float r_min, float *obstacles, int num_obs){
-        float PI = 3.1415926535;
+    __device__ void LSLcost(float *curCost, float *point1,float *point2, int r_min, float *obstacles, int num_obs){
+        float PI = 3.141592653589793;
 
         float p_c1 [2] = { point1[0] + (r_min * cosf(point1[2] + PI/2)), point1[1] + (r_min * sinf(point1[2] + PI/2))}; 
         float p_c2 [2] = { point2[0] + (r_min * cosf(point2[2] + PI/2)), point2[1] + (r_min * sinf(point2[2] + PI/2))};
@@ -154,7 +152,6 @@ mod = SourceModule("""
 
         float V2 [2] = {tangent_2[0]-tangent_1[0],tangent_2[1]-tangent_1[1]};
 
-
         float p2_h [2] = {point1[0], point1[1]};
         float v1 [2] = {p2_h[0]-p_c1[0], p2_h[1]-p_c1[1]};
         float v2 [2] = {tangent_1[0]-p_c1[0], tangent_1[1]-p_c1[1]};
@@ -169,13 +166,12 @@ mod = SourceModule("""
 
         float x_vals [150] = { };
         float y_vals [150] = { };
-        float d_theta = theta_1/50;
+        float d_theta = theta_1/49;
 
         for (int i=0;i<50;i++){
             x_vals[i] = (abs(r_1) * cosf(angle+(i*d_theta))) + p_c1[0];
             y_vals[i] = (abs(r_1) * sinf(angle+(i*d_theta))) + p_c1[1];
         }
-
 
         float p3_h [2] = {point2[0], point2[1]};
         v1[0] = tangent_2[0]-p_c2[0];
@@ -189,18 +185,17 @@ mod = SourceModule("""
         if (theta_2<0){
             theta_2+=(PI*2);
         }
-
         angle = atan2f((tangent_2[1]-p_c2[1]),(tangent_2[0]-p_c2[0]));
 
-        d_theta = theta_2/50;
+        d_theta = theta_2/49;
 
         for (int i=0;i<50;i++){
             x_vals[i+100] = (abs(r_2) * cosf(angle+(i*d_theta))) + p_c2[0];
             y_vals[i+100] = (abs(r_2) * sinf(angle+(i*d_theta))) + p_c2[1];
         }
 
-        float d_x = (x_vals[99] - x_vals[49])/50;
-        float d_y = (y_vals[99] - y_vals[49])/50;
+        float d_x = (x_vals[100] - x_vals[49])/49;
+        float d_y = (y_vals[100] - y_vals[49])/49;
 
         for (int i=0;i<50;i++){
             x_vals[i+50] = x_vals[49] + (i*d_x);
@@ -213,7 +208,6 @@ mod = SourceModule("""
             return;
         }
 
-
         float cost = abs((r_1*theta_1)) + abs((r_2*theta_2)) + sqrtf(powf(V2[0],2) + powf(V2[1],2));
 
         if (cost> *curCost){
@@ -224,8 +218,8 @@ mod = SourceModule("""
         return;
     }
 
-    __device__ void LSRcost(float *curCost, float *point1,float *point2, float r_min, float *obstacles, int num_obs){
-        float PI = 3.1415926535;
+    __device__ void LSRcost(float *curCost, float *point1,float *point2, int r_min, float *obstacles, int num_obs){
+        float PI = 3.141592653589793;
 
         float p_c1 [2] = { point1[0] + (r_min * cosf(point1[2] + PI/2)), point1[1] + (r_min * sinf(point1[2] + PI/2))}; 
         float p_c2 [2] = { point2[0] + (r_min * cosf(point2[2] - PI/2)), point2[1] + (r_min * sinf(point2[2] - PI/2))};
@@ -252,7 +246,6 @@ mod = SourceModule("""
 
         float V2 [2] = {tangent_2[0]-tangent_1[0],tangent_2[1]-tangent_1[1]};
 
-
         float p2_h [2] = {point1[0], point1[1]};
         float v1 [2] = {p2_h[0]-p_c1[0], p2_h[1]-p_c1[1]};
         float v2 [2] = {tangent_1[0]-p_c1[0], tangent_1[1]-p_c1[1]};
@@ -267,12 +260,13 @@ mod = SourceModule("""
 
         float x_vals [150] = { };
         float y_vals [150] = { };
-        float d_theta = theta_1/50;
+        float d_theta = theta_1/49;
 
         for (int i=0;i<50;i++){
             x_vals[i] = (abs(r_1) * cosf(angle+(i*d_theta))) + p_c1[0];
             y_vals[i] = (abs(r_1) * sinf(angle+(i*d_theta))) + p_c1[1];
         }
+
 
         float p3_h [2] = {point2[0], point2[1]};
         v1[0] = tangent_2[0]-p_c2[0];
@@ -289,15 +283,15 @@ mod = SourceModule("""
 
         angle = atan2f((tangent_2[1]-p_c2[1]),(tangent_2[0]-p_c2[0]));
 
-        d_theta = theta_2/50;
+        d_theta = theta_2/49;
 
         for (int i=0;i<50;i++){
             x_vals[i+100] = (abs(r_2) * cosf(angle+(i*d_theta))) + p_c2[0];
             y_vals[i+100] = (abs(r_2) * sinf(angle+(i*d_theta))) + p_c2[1];
         }
 
-        float d_x = (x_vals[99] - x_vals[49])/50;
-        float d_y = (y_vals[99] - y_vals[49])/50;
+        float d_x = (x_vals[100] - x_vals[49])/49;
+        float d_y = (y_vals[100] - y_vals[49])/49;
 
         for (int i=0;i<50;i++){
             x_vals[i+50] = x_vals[49] + (i*d_x);
@@ -320,8 +314,8 @@ mod = SourceModule("""
         return;
     }
 
-    __device__ void RSLcost(float *curCost, float *point1,float *point2, float r_min, float *obstacles, int num_obs){
-        float PI = 3.1415926535;
+    __device__ void RSLcost(float *curCost, float *point1,float *point2, int r_min, float *obstacles, int num_obs){
+        float PI = 3.141592653589793;
 
         float p_c1 [2] = { point1[0] + (r_min * cosf(point1[2] - PI/2)), point1[1] + (r_min * sinf(point1[2] - PI/2))}; 
         float p_c2 [2] = { point2[0] + (r_min * cosf(point2[2] + PI/2)), point2[1] + (r_min * sinf(point2[2] + PI/2))};
@@ -362,13 +356,12 @@ mod = SourceModule("""
 
         float x_vals [150] = { };
         float y_vals [150] = { };
-        float d_theta = theta_1/50;
+        float d_theta = theta_1/49;
 
         for (int i=0;i<50;i++){
             x_vals[i] = (abs(r_1) * cosf(angle+(i*d_theta))) + p_c1[0];
             y_vals[i] = (abs(r_1) * sinf(angle+(i*d_theta))) + p_c1[1];
         }
-
 
         float p3_h [2] = {point2[0], point2[1]};
         v1[0] = tangent_2[0]-p_c2[0];
@@ -385,15 +378,15 @@ mod = SourceModule("""
 
         angle = atan2f((tangent_2[1]-p_c2[1]),(tangent_2[0]-p_c2[0]));
 
-        d_theta = theta_2/50;
+        d_theta = theta_2/49;
 
         for (int i=0;i<50;i++){
             x_vals[i+100] = (abs(r_2) * cosf(angle+(i*d_theta))) + p_c2[0];
             y_vals[i+100] = (abs(r_2) * sinf(angle+(i*d_theta))) + p_c2[1];
         }
 
-        float d_x = (x_vals[99] - x_vals[49])/50;
-        float d_y = (y_vals[99] - y_vals[49])/50;
+        float d_x = (x_vals[100] - x_vals[49])/49;
+        float d_y = (y_vals[100] - y_vals[49])/49;
 
         for (int i=0;i<50;i++){
             x_vals[i+50] = x_vals[49] + (i*d_x);
@@ -417,7 +410,6 @@ mod = SourceModule("""
     }
 
     __device__ bool computeDubinsCost(float &cost, float *point1, float *point2, float r_min, float *obstacles, int num_obs){
-
         float curCost = cost;
 
         RSRcost(&curCost, point1, point2, r_min, obstacles, num_obs);
