@@ -15,32 +15,28 @@ mod = SourceModule("""
 
 	#include <stdio.h>
 
-	__device__ bool check_col(float *y_vals,float *x_vals,float *obstacles, int num_obs){
+	__device__ bool check_col(float *y_vals,float *x_vals,float *obstacles, int num_obs)
+	{
 
-
-	  if (num_obs==0){
+	if (num_obs==0){
 	    return false;
 	  }
 
-	  for (int obs=0;obs<num_obs;obs++){
+	 for (int obs=0;obs<num_obs;obs++){
 	    for (int i=0;i<150;i++){
 
-	      if (obstacles[obs*4 +3]>obstacles[obs*4 +1]){
-	        if (obstacles[obs*4 +3]>=y_vals[i] && obstacles[obs*4 +1]<=y_vals[i]) {
-	        if (obstacles[obs*4]>=x_vals[i] && obstacles[obs*4 + 2]<=x_vals[i]){
+	      float min_y = fmin(obstacles[obs*4 +3],obstacles[obs*4 +1]);
+	      float max_y = fmax(obstacles[obs*4 +3],obstacles[obs*4 +1]);
+
+	      float min_x = fmin(obstacles[obs*4],obstacles[obs*4 +2]);
+	      float max_x = fmax(obstacles[obs*4],obstacles[obs*4 +2]);
+
+	      if (max_y>=y_vals[i] && min_y<=y_vals[i]) {
+	        if (max_x>=x_vals[i] && min_x<=x_vals[i]){
 	          return true;
 	          }
-	      }
 	      }
 
-	      else{
-	        if (obstacles[obs*4 +3]<=y_vals[i] && obstacles[obs*4 +1]>=y_vals[i]) {
-	        if (obstacles[obs*4]<=x_vals[i] && obstacles[obs*4 + 2]>=x_vals[i]){
-	          return true;
-	          }
-	      }
-	      
-	      }
 	    }
 	  }
 	  return false;

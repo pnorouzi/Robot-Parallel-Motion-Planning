@@ -9,10 +9,6 @@ mod = SourceModule("""
 
 __device__ bool check_col(float *y_vals,float *x_vals,float *obstacles, int num_obs){
 
-  //printf ("obs_: %4.2f\\n",obstacles[0*4 +2]);
-  //printf ("y_vals 89 %4.8f\\n",y_vals[89]);
-  //printf ("x_vals 19 %4.8f\\n",x_vals[19]);
-  //printf("num_obssss %d\\n",num_obs);
 
   for (int obs=0;obs<num_obs;obs++){
     for (int i=0;i<150;i++){
