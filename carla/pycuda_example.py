@@ -584,6 +584,11 @@ class GMT(object):
             wavefront(dev_Gindicator, self.dev_open, self.dev_cost, self.dev_threshold, self.dev_n, block=(threadsPerBlock,1,1), grid=(nBlocksPerGrid,1))
             self.dev_threshold += self.dev_threshold
             goal_reached = dev_Gindicator[self.goal].get() == 1
+            
+            dev_Gscan = cuda.to_gpu(dev_Gindicator)
+            exclusiveScan(dev_Gscan)
+            dev_gSize = dev_Gscan[-1] + dev_Gindicator[-1]
+            gSize = int(dev_gSize.get())
 
             ######### scan and compact open set to connect neighbors ###############
             dev_yscan = cuda.to_gpu(self.dev_open)
@@ -593,11 +598,6 @@ class GMT(object):
 
             dev_y = cuda.zeros(ySize, dtype=np.int32)
             compact(dev_y, dev_yscan, self.dev_open, self.dev_waypoints, self.dev_n, block=(threadsPerBlock,1,1), grid=(nBlocksPerGrid,1))
-            
-            dev_Gscan = cuda.to_gpu(dev_Gindicator)
-            exclusiveScan(dev_Gscan)
-            dev_gSize = dev_Gscan[-1] + dev_Gindicator[-1]
-            gSize = int(dev_gSize.get())
 
             if ySize == 0:
                 print('### empty open set ###')
@@ -613,7 +613,7 @@ class GMT(object):
                 self.get_path()
                 return self.route
             elif gSize == 0:
-                # print('### threshold skip')
+                print('### threshold skip')
                 continue
 
             dev_G = cuda.zeros(gSize, dtype=np.int32)

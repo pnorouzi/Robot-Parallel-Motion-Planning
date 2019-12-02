@@ -62,7 +62,7 @@ class CudaAgent(Agent):
         # for each waypoint wp
         for i, wi in enumerate(wp):
             li = wi.location
-            # ni = []
+            ni = []
             num  = 0
             # find other waypoints within disk radius
             for j, wj in enumerate(wp):
@@ -75,35 +75,34 @@ class CudaAgent(Agent):
                         if k == (num_yaw)/2:
                             continue
                         elif k > (num_yaw)/2:
-                            neighbors.append(j*(num_yaw-1) + k-1)
+                            ni.append(j*(num_yaw-1) + k-1)
                         else:
-                            neighbors.append(j*(num_yaw-1) + k)
+                            ni.append(j*(num_yaw-1) + k)
                         num += 1
 
-            num_neighbors.append(num)
-            
             # add in number of yaw orientations to waypoint list        
             ri = wi.rotation
             for k in range(num_yaw):
                 if k == (num_yaw)/2:
                     continue
 
-                # self.neighbors.append(ni)
+                num_neighbors.append(num)
+                neighbors += 4*ni
 
                 theta = ri.yaw + k*360/(num_yaw)
                 if theta >= 180:
                     theta = theta - 360
                 elif theta <= -180:
                     theta = 360 - theta
-                states.append([li.x, li.y, theta])
+                states.append([li.x, li.y, theta*np.pi/180])
 
-        self.states = np.array(states)
-        self.neighbors = np.array(neighbors)
-        self.num_neighbors = np.array(num_neighbors)
+        self.states = np.array(states).astype(np.float32)
+        self.neighbors = np.array(neighbors).astype(np.int32)
+        self.num_neighbors = np.array(num_neighbors).astype(np.int32)
 
         init_parameters = {'states':self.states, 'neighbors':self.neighbors, 'num_neighbors':self.num_neighbors}
-        self.start = self.states.shape[0] - 1
-        self.goal = self.states.shape[0] - 2
+        self.start = self.states.shape[0] - 7
+        self.goal = self.states.shape[0] - 14
     
         self.gmt_planner = GMT(init_parameters, debug=True)
 
@@ -119,7 +118,7 @@ class CudaAgent(Agent):
         self.obstacles = obstacles = np.array([[5,4,7,3]]).astype(np.float32)
 
         iter_parameters = {'start':self.start, 'goal':self.goal, 'radius':self.radius, 'threshold':self.threshold, 'obstacles':self.obstacles}
-        route = self.gmt_planner.run_step(iter_parameters, iter_limit=300, debug=debug)
+        route = self.gmt_planner.run_step(iter_parameters, iter_limit=10000, debug=debug)
         if debug:
             print('route: ', route)
         # del route[-1]
@@ -133,10 +132,10 @@ class CudaAgent(Agent):
         self.current_location = self._vehicle.get_transform()
         self.current_speed = get_speed(self._vehicle)
 
-        self.radius = 4
-        self.threshold  = 4
+        self.radius = 2
+        self.threshold  = 2
 
-        route = []#self._trace_route(debug) # get plan
+        route = self._trace_route(debug) # get plan
         if len(route) == 0:
             wp = self.start
         else:
