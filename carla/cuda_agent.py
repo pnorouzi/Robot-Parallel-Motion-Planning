@@ -45,6 +45,58 @@ class CudaAgent(object):
         self.start_waypoint = self._map.get_waypoint(self._vehicle.get_location())
         self.end_waypoint = self._map.get_waypoint(carla.Location(location[0], location[1], location[2]))
 
+    @staticmethod
+    def _create_bb_points(vehicle):
+
+        cords = np.zeros((3, 4))
+        extent = vehicle.bounding_box.extent
+
+        cords[0, :] = np.array([extent.x, extent.y, extent.z, 1])
+        cords[1, :] = np.array([-extent.x, -extent.y, extent.z, 1])
+        cords[3, :] = np.array([0, 0, 0, 1])    # center
+
+        return cords
+
+    @staticmethod
+    def _vehicle_to_world(cords, vehicle):
+
+
+        bb_transform = carla.Transform(vehicle.bounding_box.location)
+        bb_vehicle_matrix = ClientSideBoundingBoxes.get_matrix(bb_transform)
+        vehicle_world_matrix = ClientSideBoundingBoxes.get_matrix(vehicle.get_transform())
+        bb_world_matrix = np.dot(vehicle_world_matrix, bb_vehicle_matrix)
+        world_cords = np.dot(bb_world_matrix, np.transpose(cords))
+        return world_cords
+
+    @staticmethod
+    def get_matrix(transform):
+
+
+        rotation = transform.rotation
+        location = transform.location
+        c_y = np.cos(np.radians(rotation.yaw))
+        s_y = np.sin(np.radians(rotation.yaw))
+        c_r = np.cos(np.radians(rotation.roll))
+        s_r = np.sin(np.radians(rotation.roll))
+        c_p = np.cos(np.radians(rotation.pitch))
+        s_p = np.sin(np.radians(rotation.pitch))
+        matrix = np.matrix(np.identity(4))
+        matrix[0, 3] = location.x
+        matrix[1, 3] = location.y
+        matrix[2, 3] = location.z
+        matrix[0, 0] = c_p * c_y
+        matrix[0, 1] = c_y * s_p * s_r - s_y * c_r
+        matrix[0, 2] = -c_y * s_p * c_r - s_y * s_r
+        matrix[1, 0] = s_y * c_p
+        matrix[1, 1] = s_y * s_p * s_r + c_y * c_r
+        matrix[1, 2] = -s_y * s_p * c_r + c_y * s_r
+        matrix[2, 0] = s_p
+        matrix[2, 1] = -c_p * s_r
+        matrix[2, 2] = c_p * c_r
+        return matrix
+
+
+
     def _trace_route(self):
         ## TODO ## 
         # obstacle detection #
@@ -58,14 +110,22 @@ class CudaAgent(object):
         for vehicle in self._world.get_actors().filter('vehicle.*'):
                 #print(vehicle.bounding_box)
                 # draw Box
-                transform = vehicle.get_transform()
-                bounding_box = vehicle.bounding_box
-                bounding_box.location += transform.location
-                my_location = self.current_location.location
-                dist = np.sqrt((my_location.x-bounding_box.location.x)**2 + (my_location.y-bounding_box.location.y)**2 + (my_location.z-bounding_box.location.z)**2)
+                bb_points = CudaAgent._create_bb_points(vehicle)
+                global_points= CudaAgent._vehicle_to_world(bb_points, vehicle)
+                global_points /= global_points[:,3]
+
+                my_bb_points = CudaAgent._create_bb_points(self._vehicle)
+                my_global_points = CudaAgent._vehicle_to_world(my_bb_points, self._vehicle)
+
+                my_global_points /= my_global_points[:,3]
+                # transform = vehicle.get_transform()
+                # bounding_box = vehicle.bounding_box
+                # bounding_box.location += transform.location
+                # my_location = self.current_location.location
+                dist = np.sqrt((my_global_points[2,0]-global_points[2,0])**2 + (my_global_points[2,1]-global_points[2,1])**2 + (my_global_points[2,2]-global_points[2,2])**2)
 
                 if 0<dist <=30:
-                    vehicle_box = [bounding_box.location.x - bounding_box.extent.x,bounding_box.location.y - bounding_box.extent.y,bounding_box.location.x + bounding_box.extent.x,bounding_box.location.y + bounding_box.extent.y]
+                    vehicle_box = [global_points[0,0],global_points[0,1],global_points[1,0],global_points[1,1]]
                     obstacles.append(vehicle_box)
 
         if len(obstacle) == 0:
