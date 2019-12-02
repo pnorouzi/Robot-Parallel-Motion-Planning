@@ -115,9 +115,36 @@ class CudaAgent(Agent):
         # gmt(self._vehicle.get_location(), self.end_waypoint, obstacle_list)
         # waypoint = world.map.get_waypoint(world.player.get_location(), project_to_road=True, lane_type=(carla.LaneType.Driving | carla.LaneType.Shoulder | carla.LaneType.Sidewalk))
     
-        self.obstacles = obstacles = np.array([[5,4,7,3]]).astype(np.float32)
+        obstacles = []
+        for vehicle in self._world.get_actors().filter('vehicle.*'):
+                #print(vehicle.bounding_box)
+                # draw Box
+                bb_points = CudaAgent._create_bb_points(vehicle)
+                global_points= CudaAgent._vehicle_to_world(bb_points, vehicle)
+                global_points /= global_points[:,3]
 
-        iter_parameters = {'start':self.start, 'goal':self.goal, 'radius':self.radius, 'threshold':self.threshold, 'obstacles':self.obstacles}
+                my_bb_points = CudaAgent._create_bb_points(self._vehicle)
+                my_global_points = CudaAgent._vehicle_to_world(my_bb_points, self._vehicle)
+
+                my_global_points /= my_global_points[:,3]
+                # transform = vehicle.get_transform()
+                # bounding_box = vehicle.bounding_box
+                # bounding_box.location += transform.location
+                # my_location = self.current_location.location
+                dist = np.sqrt((my_global_points[2,0]-global_points[2,0])**2 + (my_global_points[2,1]-global_points[2,1])**2 + (my_global_points[2,2]-global_points[2,2])**2)
+
+                if 0<dist <=30:
+                    vehicle_box = [global_points[0,0],global_points[0,1],global_points[1,0],global_points[1,1]]
+                    obstacles.append(vehicle_box)
+
+        if len(obstacle) == 0:
+            self._obstacles = np.array([[-1,-1,-1,-1]]).astype(np.float32)
+            self.num_obs = np.int32(0)
+        else:
+            self._obstacles = np.array(obstacles).astype(np.float32)
+            self.num_obs = np.int32(self._obstacles.shape[0])
+
+        iter_parameters = {'start':self.start, 'goal':self.goal, 'radius':self.radius, 'threshold':self.threshold, 'obstacles':self.obstacles, 'num_obs':self.num_obs}
         route = self.gmt_planner.run_step(iter_parameters, iter_limit=10000, debug=debug)
         if debug:
             print('route: ', route)

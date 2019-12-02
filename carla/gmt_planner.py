@@ -17,10 +17,17 @@ mod = SourceModule("""
     #include <stdio.h>
 
     __device__ bool check_col(float *y_vals,float *x_vals,float *obstacles, int num_obs){
+        if (num_obs==0){
+            return false;
+        }
         for (int obs=0;obs<num_obs;obs++){
             for (int i=0;i<150;i++){
-                if (obstacles[obs*4 +3]<=y_vals[i] && obstacles[obs*4 +1]>=y_vals[i]) {
-                    if (obstacles[obs*4]<=x_vals[i] && obstacles[obs*4 + 2]>=x_vals[i]){
+                float min_y = fmin(obstacles[obs*4 +3],obstacles[obs*4 +1]);
+                float max_y = fmax(obstacles[obs*4 +3],obstacles[obs*4 +1]);
+                float min_x = fmin(obstacles[obs*4],obstacles[obs*4 +2]);
+                float max_x = fmax(obstacles[obs*4],obstacles[obs*4 +2]);
+                if (max_y>=y_vals[i] && min_y<=y_vals[i]) {
+                    if (max_x>=x_vals[i] && min_x<=x_vals[i]){
                         return true;
                     }
                 }
@@ -507,7 +514,7 @@ class GMT(object):
         self.dev_states = cuda.to_gpu(self.states)
         self.dev_waypoints = cuda.to_gpu(self.waypoints)
 
-        self.dev_n = cuda.to_gpu(np.array([self.n]))
+        self.dev_n = cuda.to_gpu(np.array([self.n]).astype(np.int32))
 
         self.dev_neighbors = cuda.to_gpu(self.neighbors)
         self.dev_num_neighbors = cuda.to_gpu(self.num_neighbors)
@@ -520,7 +527,7 @@ class GMT(object):
         self.Vopen[self.start] = 0
 
         self.obstacles = iter_parameters['obstacles']
-        self.num_obs = np.array([self.obstacles.shape[0]]).astype(np.int32)
+        self.num_obs = iter_parameters['num_obs']
         self.parent = np.full(self.n, -1).astype(np.int32)
 
         self.start = iter_parameters['start']
