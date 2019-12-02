@@ -12,17 +12,34 @@ import numpy as np
 '''
 
 mod = SourceModule("""
-	
+
+	#include <stdio.h>
+
 	__device__ bool check_col(float *y_vals,float *x_vals,float *obstacles, int num_obs){
 
+
+	  if (num_obs==0){
+	    return false;
+	  }
 
 	  for (int obs=0;obs<num_obs;obs++){
 	    for (int i=0;i<150;i++){
 
-	      if (obstacles[obs*4 +3]<=y_vals[i] && obstacles[obs*4 +1]>=y_vals[i]) {
+	      if (obstacles[obs*4 +3]>obstacles[obs*4 +1]){
+	        if (obstacles[obs*4 +3]>=y_vals[i] && obstacles[obs*4 +1]<=y_vals[i]) {
+	        if (obstacles[obs*4]>=x_vals[i] && obstacles[obs*4 + 2]<=x_vals[i]){
+	          return true;
+	          }
+	      }
+	      }
+
+	      else{
+	        if (obstacles[obs*4 +3]<=y_vals[i] && obstacles[obs*4 +1]>=y_vals[i]) {
 	        if (obstacles[obs*4]<=x_vals[i] && obstacles[obs*4 + 2]>=x_vals[i]){
 	          return true;
 	          }
+	      }
+	      
 	      }
 	    }
 	  }
@@ -442,7 +459,7 @@ mod = SourceModule("""
 	  return;
 	}
 
-    __device__ bool computeDubinsCost(float &cost, float *point1, float *point2, float r_min, float *obstacles, int num_obs){
+	__device__ bool computeDubinsCost(float &cost, float *point1, float *point2, float r_min, float *obstacles, int num_obs){
 
         float curCost = cost;
 
