@@ -64,7 +64,7 @@ class CudaAgent(object):
                 my_location = self.current_location.location
                 dist = np.sqrt((my_location.x-bounding_box.location.x)**2 + (my_location.y-bounding_box.location.y)**2 + (my_location.z-bounding_box.location.z)**2)
 
-                if dist <=30:
+                if 0<dist <=30:
                     vehicle_box = [bounding_box.location.x - bounding_box.extent.x,bounding_box.location.y - bounding_box.extent.y,bounding_box.location.x + bounding_box.extent.x,bounding_box.location.y + bounding_box.extent.y]
                     obstacles.append(vehicle_box)
 
