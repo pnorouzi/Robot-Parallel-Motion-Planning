@@ -53,6 +53,28 @@ class CudaAgent(object):
         # obstacle_list = [] # detection
         # gmt(self._vehicle.get_location(), self.end_waypoint, obstacle_list)
         # waypoint = world.map.get_waypoint(world.player.get_location(), project_to_road=True, lane_type=(carla.LaneType.Driving | carla.LaneType.Shoulder | carla.LaneType.Sidewalk))
+
+        obstacles = []
+        for vehicle in self._world.get_actors().filter('vehicle.*'):
+                #print(vehicle.bounding_box)
+                # draw Box
+                transform = vehicle.get_transform()
+                bounding_box = vehicle.bounding_box
+                bounding_box.location += transform.location
+                my_location = self.current_location.location
+                dist = np.sqrt((my_location.x-bounding_box.location.x)**2 + (my_location.y-bounding_box.location.y)**2 + (my_location.z-bounding_box.location.z)**2)
+
+                if dist <=30:
+                    vehicle_box = [bounding_box.location.x - bounding_box.extent.x,bounding_box.location.y - bounding_box.extent.y,bounding_box.location.x + bounding_box.extent.x,bounding_box.location.y + bounding_box.extent.y]
+                    obstacles.append(vehicle_box)
+
+        if len(obstacle) == 0:
+            self._obstacles = np.array([[-1,-1,-1,-1]]).astype(np.float32)
+            self.num_obs = np.int32(0)
+        else:
+            self._obstacles = np.array(obstacles).astype(np.float32)
+            self.num_obs = np.int32(self._obstacles.shape[0])
+
         pass
 
     def run_step(self, debug=False):
