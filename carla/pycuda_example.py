@@ -16,10 +16,18 @@ mod = SourceModule("""
     #include <stdio.h>
 
     __device__ bool check_col(float *y_vals,float *x_vals,float *obstacles, int num_obs){
+        if (num_obs==0){
+            return false;
+        }
         for (int obs=0;obs<num_obs;obs++){
             for (int i=0;i<150;i++){
-                if (obstacles[obs*4 +3]<=y_vals[i] && obstacles[obs*4 +1]>=y_vals[i]) {
-                    if (obstacles[obs*4]<=x_vals[i] && obstacles[obs*4 + 2]>=x_vals[i]){
+                float min_y = fmin(obstacles[obs*4 +3],obstacles[obs*4 +1]);
+                float max_y = fmax(obstacles[obs*4 +3],obstacles[obs*4 +1]);
+                float min_x = fmin(obstacles[obs*4],obstacles[obs*4 +2]);
+                float max_x = fmax(obstacles[obs*4],obstacles[obs*4 +2]);
+                if (max_y>=y_vals[i] && min_y<=y_vals[i]) {
+                    if (max_x>=x_vals[i] && min_x<=x_vals[i]){
+                        printf("obstacle here \\n");
                         return true;
                     }
                 }
@@ -28,7 +36,7 @@ mod = SourceModule("""
         return false;
     }
 
-    __device__ void RSRcost(float *curCost, float *point1,float *point2, int r_min, float *obstacles, int num_obs){
+    __device__ void RSRcost(float *curCost, float *parentCost, float *point1,float *point2, int r_min, float *obstacles, int num_obs){
         float PI = 3.141592653589793;
 
         float p_c1 [2] = { point1[0] + (r_min * cosf(point1[2] - PI/2)), point1[1] + (r_min * sinf(point1[2] - PI/2))}; 
@@ -117,6 +125,7 @@ mod = SourceModule("""
         }
 
         float cost = abs((r_1*theta_1)) + abs((r_2*theta_2)) + sqrtf(powf(V2[0],2) + powf(V2[1],2));
+        cost += *parentCost;
 
         if (cost> *curCost){
             return;
@@ -126,7 +135,7 @@ mod = SourceModule("""
         return;
     }
 
-    __device__ void LSLcost(float *curCost, float *point1,float *point2, int r_min, float *obstacles, int num_obs){
+    __device__ void LSLcost(float *curCost, float *parentCost, float *point1,float *point2, int r_min, float *obstacles, int num_obs){
         float PI = 3.141592653589793;
 
         float p_c1 [2] = { point1[0] + (r_min * cosf(point1[2] + PI/2)), point1[1] + (r_min * sinf(point1[2] + PI/2))}; 
@@ -211,6 +220,7 @@ mod = SourceModule("""
         }
 
         float cost = abs((r_1*theta_1)) + abs((r_2*theta_2)) + sqrtf(powf(V2[0],2) + powf(V2[1],2));
+        cost += *parentCost;
 
         if (cost> *curCost){
             return;
@@ -220,7 +230,7 @@ mod = SourceModule("""
         return;
     }
 
-    __device__ void LSRcost(float *curCost, float *point1,float *point2, int r_min, float *obstacles, int num_obs){
+    __device__ void LSRcost(float *curCost, float *parentCost, float *point1,float *point2, int r_min, float *obstacles, int num_obs){
         float PI = 3.141592653589793;
 
         float p_c1 [2] = { point1[0] + (r_min * cosf(point1[2] + PI/2)), point1[1] + (r_min * sinf(point1[2] + PI/2))}; 
@@ -307,6 +317,7 @@ mod = SourceModule("""
         }
 
         float cost = abs((r_1*theta_1)) + abs((r_2*theta_2)) + sqrtf(powf(V2[0],2) + powf(V2[1],2));
+        cost += *parentCost;
 
         if (cost> *curCost){
             return;
@@ -316,7 +327,7 @@ mod = SourceModule("""
         return;
     }
 
-    __device__ void RSLcost(float *curCost, float *point1,float *point2, int r_min, float *obstacles, int num_obs){
+    __device__ void RSLcost(float *curCost, float *parentCost, float *point1, float *point2, int r_min, float *obstacles, int num_obs){
         float PI = 3.141592653589793;
 
         float p_c1 [2] = { point1[0] + (r_min * cosf(point1[2] - PI/2)), point1[1] + (r_min * sinf(point1[2] - PI/2))}; 
@@ -402,8 +413,9 @@ mod = SourceModule("""
         }
 
         float cost = abs((r_1*theta_1)) + abs((r_2*theta_2)) + sqrtf(powf(V2[0],2) + powf(V2[1],2));
+        cost += *parentCost;
 
-        if (cost> *curCost){
+        if (cost > *curCost){
             return;
         }
 
@@ -411,13 +423,13 @@ mod = SourceModule("""
         return;
     }
 
-    __device__ bool computeDubinsCost(float &cost, float *point1, float *point2, float r_min, float *obstacles, int num_obs){
+    __device__ bool computeDubinsCost(float &cost, float &parentCost, float *point1, float *point2, float r_min, float *obstacles, int num_obs){
         float curCost = cost;
 
-        RSRcost(&curCost, point1, point2, r_min, obstacles, num_obs);
-        LSLcost(&curCost, point1, point2, r_min, obstacles, num_obs);
-        LSRcost(&curCost, point1, point2, r_min, obstacles, num_obs);
-        RSLcost(&curCost, point1, point2, r_min, obstacles, num_obs);
+        RSRcost(&curCost, &parentCost, point1, point2, r_min, obstacles, num_obs);
+        LSLcost(&curCost, &parentCost, point1, point2, r_min, obstacles, num_obs);
+        LSRcost(&curCost, &parentCost, point1, point2, r_min, obstacles, num_obs);
+        RSLcost(&curCost, &parentCost, point1, point2, r_min, obstacles, num_obs);
 
         bool connected = curCost < cost;
         cost = connected ? curCost : cost;
@@ -433,7 +445,7 @@ mod = SourceModule("""
         //printf("dubin %i, %i\\n", index, xSize[0]);
 
         for(int i=0; i < ySize[0]; i++){
-            bool connected = computeDubinsCost(cost[x[index]], &states[x[index]*3], &states[y[i]*3], radius[0], obstacles, num_obs[0]);
+            bool connected = computeDubinsCost(cost[x[index]], cost[y[i]], &states[x[index]*3], &states[y[i]*3], radius[0], obstacles, num_obs[0]);
             parent[x[index]] = connected ? y[i]: parent[x[index]];
             cost[x[index]] = connected ? cost[y[i]] + cost[x[index]] : cost[x[index]];
             open[x[index]] = connected ? 1 : open[x[index]];
@@ -507,16 +519,12 @@ class GMT(object):
         
         if debug:
             print('neighbors: ', self.neighbors)
-            # print('parents:', self.parent)
-            # print('cost: ', self.cost)
-            # print('Vunexplored: ', self.Vunexplored)
-            # print('Vopen: ', self.Vopen)
 
     def _gpu_init(self, debug):
         self.dev_states = cuda.to_gpu(self.states)
         self.dev_waypoints = cuda.to_gpu(self.waypoints)
 
-        self.dev_n = cuda.to_gpu(np.array([self.n]))
+        self.dev_n = cuda.to_gpu(np.array([self.n]).astype(np.int32))
 
         self.dev_neighbors = cuda.to_gpu(self.neighbors)
         self.dev_num_neighbors = cuda.to_gpu(self.num_neighbors)
@@ -529,7 +537,7 @@ class GMT(object):
         self.Vopen[self.start] = 0
 
         self.obstacles = iter_parameters['obstacles']
-        self.num_obs = np.array([self.obstacles.shape[0]]).astype(np.int32)
+        self.num_obs = iter_parameters['num_obs']
         self.parent = np.full(self.n, -1).astype(np.int32)
 
         self.start = iter_parameters['start']
@@ -568,7 +576,7 @@ class GMT(object):
 
         # del self.route[-1]
 
-    def run_step(self, iter_parameters, iter_limit=100, debug=False):
+    def run_step(self, iter_parameters, iter_limit=1000, debug=False):
         self.step_init(iter_parameters,debug)
 
         goal_reached = False
@@ -580,7 +588,7 @@ class GMT(object):
             ########## create Wave front ###############
             dev_Gindicator = cuda.zeros_like(self.dev_open, dtype=np.int32)
 
-            nBlocksPerGrid = int(math.ceil((self.n + threadsPerBlock - 1) / threadsPerBlock))
+            nBlocksPerGrid = int(((self.n + threadsPerBlock - 1) / threadsPerBlock))
             wavefront(dev_Gindicator, self.dev_open, self.dev_cost, self.dev_threshold, self.dev_n, block=(threadsPerBlock,1,1), grid=(nBlocksPerGrid,1))
             self.dev_threshold += self.dev_threshold
             goal_reached = dev_Gindicator[self.goal].get() == 1
@@ -621,7 +629,7 @@ class GMT(object):
 
             ########## creating neighbors of wave front to connect open ###############
             dev_xindicator = cuda.zeros_like(self.dev_open, dtype=np.int32)
-            gBlocksPerGrid = int(math.ceil((gSize + threadsPerBlock - 1) / threadsPerBlock))
+            gBlocksPerGrid = int(((gSize + threadsPerBlock - 1) / threadsPerBlock))
             neighborIndicator(dev_xindicator, dev_G, self.dev_unexplored, self.dev_neighbors, self.dev_num_neighbors, self.neighbors_index, dev_gSize, block=(threadsPerBlock,1,1), grid=(gBlocksPerGrid,1))
 
             dev_xscan = cuda.to_gpu(dev_xindicator)
@@ -638,7 +646,7 @@ class GMT(object):
 
             ######### connect neighbors ####################
             # # launch planning
-            xBlocksPerGrid = int(math.ceil((xSize + threadsPerBlock - 1) / threadsPerBlock))
+            xBlocksPerGrid = int(((xSize + threadsPerBlock - 1) / threadsPerBlock))
             dubinConnection(self.dev_cost, self.dev_parent, dev_x, dev_y, self.dev_states, self.dev_open, self.dev_unexplored, dev_xSize, dev_ySize, self.dev_obstacles, self.dev_num_obs, self.dev_radius, block=(threadsPerBlock,1,1), grid=(xBlocksPerGrid,1))
 
             if debug:
@@ -657,20 +665,34 @@ class GMT(object):
 
 
 if __name__ == '__main__':
-    states = np.array([[1,2,135], [0,3,30], [0,3,45], [1,2,-90], [1,2,-60], [0,3,-45]]).astype(np.float32)
+    states = np.array([[10,2,135*np.pi/180], [10,2,90*np.pi/180], [10,2,45*np.pi/180], # 0-2
+        [8,5,135*np.pi/180], [8,5,90*np.pi/180], [8,5,45*np.pi/180], # 3-5
+        [12,6,135*np.pi/180], [12,6,90*np.pi/180], [12,6,45*np.pi/180], # 6-8
+        [11,8,135*np.pi/180], [11,8,90*np.pi/180], [11,8,45*np.pi/180], # 9-11
+        [2,7,135*np.pi/180], [2,7,90*np.pi/180], [2,7,45*np.pi/180], # 12-14
+        [5,10,135*np.pi/180], [5,10,90*np.pi/180], [5,10,45*np.pi/180]]).astype(np.float32) #15-17
 
-    neighbors = np.array([1,2, 0,3, 0,3,4, 1,2,4, 2,3,5, 4]).astype(np.int32)
-    num_neighbors = np.array([2, 2, 3, 3, 3, 1]).astype(np.int32)
+    n0 = [3,4,5,6,7,8]
+    n1 = [0,1,2,9,10,11,12,13,14,15,16,17]
+    n2 = [3,4,5,9,10,11]
+    n3 = [3,4,5,6,7,8,15,16,17]
+    n4 = [3,4,5,15,16,17]
+    n5 = [3,4,5,9,10,11,12,13,14]
+    nn = 3*n0 + 3*n1 + 3*n2 + 3*n3 + 3*n4 + 3*n5
 
-    obstacles = np.array([[10,20,15,15], [-6,-3,-3,-6], [7,10,10,7]]).astype(np.float32)
+    neighbors = np.array(nn).astype(np.int32)
+    num_neighbors = np.array([6,6,6, 12,12,12, 6,6,6, 9,9,9, 6,6,6, 9,9,9]).astype(np.int32)
 
-    start = 0
-    goal = 5
+    obstacles = np.array([[7,6,4,9]]).astype(np.float32)
+    num_obs = np.array([1]).astype(np.int32)
+
+    start = 1
+    goal = 15
     radius = 2
     threshold = 10
 
     init_parameters = {'states':states, 'neighbors':neighbors, 'num_neighbors':num_neighbors}
-    iter_parameters = {'start':start, 'goal':goal, 'radius':radius, 'threshold':threshold, 'obstacles':obstacles}
+    iter_parameters = {'start':start, 'goal':goal, 'radius':radius, 'threshold':threshold, 'obstacles':obstacles, 'num_obs':num_obs}
 
     gmt = GMT(init_parameters, debug=True)
     route = gmt.run_step(iter_parameters, iter_limit=8, debug=True)

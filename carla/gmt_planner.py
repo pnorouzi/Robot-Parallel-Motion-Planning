@@ -36,7 +36,7 @@ mod = SourceModule("""
         return false;
     }
 
-    __device__ void RSRcost(float *curCost, float *point1,float *point2, int r_min, float *obstacles, int num_obs){
+    __device__ void RSRcost(float *curCost, float *parentCost, float *point1,float *point2, int r_min, float *obstacles, int num_obs){
         float PI = 3.141592653589793;
 
         float p_c1 [2] = { point1[0] + (r_min * cosf(point1[2] - PI/2)), point1[1] + (r_min * sinf(point1[2] - PI/2))}; 
@@ -125,6 +125,7 @@ mod = SourceModule("""
         }
 
         float cost = abs((r_1*theta_1)) + abs((r_2*theta_2)) + sqrtf(powf(V2[0],2) + powf(V2[1],2));
+        cost += *parentCost;
 
         if (cost> *curCost){
             return;
@@ -134,7 +135,7 @@ mod = SourceModule("""
         return;
     }
 
-    __device__ void LSLcost(float *curCost, float *point1,float *point2, int r_min, float *obstacles, int num_obs){
+    __device__ void LSLcost(float *curCost, float *parentCost, float *point1,float *point2, int r_min, float *obstacles, int num_obs){
         float PI = 3.141592653589793;
 
         float p_c1 [2] = { point1[0] + (r_min * cosf(point1[2] + PI/2)), point1[1] + (r_min * sinf(point1[2] + PI/2))}; 
@@ -219,6 +220,7 @@ mod = SourceModule("""
         }
 
         float cost = abs((r_1*theta_1)) + abs((r_2*theta_2)) + sqrtf(powf(V2[0],2) + powf(V2[1],2));
+        cost += *parentCost;
 
         if (cost> *curCost){
             return;
@@ -228,7 +230,7 @@ mod = SourceModule("""
         return;
     }
 
-    __device__ void LSRcost(float *curCost, float *point1,float *point2, int r_min, float *obstacles, int num_obs){
+    __device__ void LSRcost(float *curCost, float *parentCost, float *point1,float *point2, int r_min, float *obstacles, int num_obs){
         float PI = 3.141592653589793;
 
         float p_c1 [2] = { point1[0] + (r_min * cosf(point1[2] + PI/2)), point1[1] + (r_min * sinf(point1[2] + PI/2))}; 
@@ -315,6 +317,7 @@ mod = SourceModule("""
         }
 
         float cost = abs((r_1*theta_1)) + abs((r_2*theta_2)) + sqrtf(powf(V2[0],2) + powf(V2[1],2));
+        cost += *parentCost;
 
         if (cost> *curCost){
             return;
@@ -324,7 +327,7 @@ mod = SourceModule("""
         return;
     }
 
-    __device__ void RSLcost(float *curCost, float *point1,float *point2, int r_min, float *obstacles, int num_obs){
+    __device__ void RSLcost(float *curCost, float *parentCost, float *point1, float *point2, int r_min, float *obstacles, int num_obs){
         float PI = 3.141592653589793;
 
         float p_c1 [2] = { point1[0] + (r_min * cosf(point1[2] - PI/2)), point1[1] + (r_min * sinf(point1[2] - PI/2))}; 
@@ -410,8 +413,9 @@ mod = SourceModule("""
         }
 
         float cost = abs((r_1*theta_1)) + abs((r_2*theta_2)) + sqrtf(powf(V2[0],2) + powf(V2[1],2));
+        cost += *parentCost;
 
-        if (cost> *curCost){
+        if (cost > *curCost){
             return;
         }
 
@@ -419,13 +423,13 @@ mod = SourceModule("""
         return;
     }
 
-    __device__ bool computeDubinsCost(float &cost, float *point1, float *point2, float r_min, float *obstacles, int num_obs){
+    __device__ bool computeDubinsCost(float &cost, float &parentCost, float *point1, float *point2, float r_min, float *obstacles, int num_obs){
         float curCost = cost;
 
-        RSRcost(&curCost, point1, point2, r_min, obstacles, num_obs);
-        LSLcost(&curCost, point1, point2, r_min, obstacles, num_obs);
-        LSRcost(&curCost, point1, point2, r_min, obstacles, num_obs);
-        RSLcost(&curCost, point1, point2, r_min, obstacles, num_obs);
+        RSRcost(&curCost, &parentCost, point1, point2, r_min, obstacles, num_obs);
+        LSLcost(&curCost, &parentCost, point1, point2, r_min, obstacles, num_obs);
+        LSRcost(&curCost, &parentCost, point1, point2, r_min, obstacles, num_obs);
+        RSLcost(&curCost, &parentCost, point1, point2, r_min, obstacles, num_obs);
 
         bool connected = curCost < cost;
         cost = connected ? curCost : cost;
@@ -439,7 +443,7 @@ mod = SourceModule("""
         }
 
         for(int i=0; i < ySize[0]; i++){
-            bool connected = computeDubinsCost(cost[x[index]], &states[x[index]*3], &states[y[i]*3], radius[0], obstacles, num_obs[0]);
+            bool connected = computeDubinsCost(cost[x[index]], cost[y[i]], &states[x[index]*3], &states[y[i]*3], radius[0], obstacles, num_obs[0]);
             parent[x[index]] = connected ? y[i]: parent[x[index]];
             cost[x[index]] = connected ? cost[y[i]] + cost[x[index]] : cost[x[index]];
             open[x[index]] = connected ? 1 : open[x[index]];
