@@ -168,7 +168,6 @@ class CudaAgent(Agent):
                 # draw Box
                 bb_points = CudaAgent._create_bb_points(vehicle)
                 global_points= CudaAgent._vehicle_to_world(bb_points, vehicle)
-                print(global_points)
                 global_points /= global_points[3,:]
 
                 my_bb_points = CudaAgent._create_bb_points(self._vehicle)
@@ -185,7 +184,7 @@ class CudaAgent(Agent):
                     vehicle_box = [global_points[0,0],global_points[1,0],global_points[0,1],global_points[1,1]]
                     obstacles.append(vehicle_box)
 
-        print(len(obstacles))
+        print('number of near obstacles: ', len(obstacles))
         if len(obstacles) == 0:
             self.obstacles = np.array([[-1,-1,-1,-1]]).astype(np.float32)
             self.num_obs = self.num_obs = np.array([0]).astype(np.int32)
