@@ -513,6 +513,7 @@ class GMT(object):
         
         if debug:
             print('neighbors: ', self.neighbors)
+            print('number neighbors: ', self.num_neighbors)
 
     def _gpu_init(self, debug):
         self.dev_states = cuda.to_gpu(self.states)

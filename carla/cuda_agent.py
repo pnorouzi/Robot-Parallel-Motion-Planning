@@ -10,7 +10,6 @@ from agents.tools.misc import get_speed
 from localized_controller import VehiclePIDController
 from gmt_planner import *
 
-
 class CudaAgent(Agent):
     def __init__(self, vehicle, target_speed=50):
         """
@@ -45,7 +44,7 @@ class CudaAgent(Agent):
         self.start_waypoint = self._map.get_waypoint(self._vehicle.get_location())
         self.end_waypoint = self._map.get_waypoint(carla.Location(location[0], location[1], location[2]))
 
-    def create_samples(self, start, goal, waypoint_dist = 2, disk_radius = 10, num_yaw = 8):
+    def create_samples(self, start, goal, waypoint_dist = 2, disk_radius = 2*math.sqrt(2), num_yaw = 8):
         print(f'Creating samples {waypoint_dist}m apart with {num_yaw} yaw vaules and neighbors within {disk_radius}m.')
 
         wp = []
@@ -87,7 +86,7 @@ class CudaAgent(Agent):
                     continue
 
                 num_neighbors.append(num)
-                neighbors += 4*ni
+                neighbors += ni
 
                 theta = ri.yaw + k*360/(num_yaw)
                 if theta >= 180:
