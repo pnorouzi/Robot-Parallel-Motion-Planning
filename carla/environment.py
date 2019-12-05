@@ -60,7 +60,7 @@ class World(object):
         print(f'Creating {num_obstacles} obstacles.')
         obstacles = 0
         # continue randomly spawning obstacles until desired number reached
-        while obstacles < num_obstacles:
+        for i in range(num_obstacles):
             transform = random.choice(self.world.get_map().get_spawn_points())
             transform.rotation.yaw = random.randrange(-180.0, 180.0, 1.0) # get random yaw orientation so vehicles don't line up
 
@@ -112,7 +112,7 @@ class Camera(object):
         self.world.actor_list.append(self.sensor) # add to actor_list of world so we can clean up later
 
         weak_self = weakref.ref(self)
-        self.sensor.listen(lambda image: Camera.callback(weak_self,image))
+        # self.sensor.listen(lambda image: Camera.callback(weak_self,image))
 
     @staticmethod
     def callback(weak_self, data):

@@ -44,7 +44,7 @@ class CudaAgent(Agent):
         self.start_waypoint = self._map.get_waypoint(self._vehicle.get_location())
         self.end_waypoint = self._map.get_waypoint(carla.Location(location[0], location[1], location[2]))
 
-    def create_samples(self, start, goal, waypoint_dist = 2, disk_radius = 2*math.sqrt(2), num_yaw = 8):
+    def create_samples(self, start, goal, waypoint_dist = 5, disk_radius = 5*math.sqrt(2), num_yaw = 8):
         print(f'Creating samples {waypoint_dist}m apart with {num_yaw} yaw vaules and neighbors within {disk_radius}m.')
 
         wp = []
@@ -102,6 +102,8 @@ class CudaAgent(Agent):
         init_parameters = {'states':self.states, 'neighbors':self.neighbors, 'num_neighbors':self.num_neighbors}
         self.start = self.states.shape[0] - 7
         self.goal = self.states.shape[0] - 14
+
+        print(f'start: {self.start} goal: {self.goal}')
     
         self.gmt_planner = GMT(init_parameters, debug=True)
 
@@ -215,9 +217,10 @@ class CudaAgent(Agent):
             wp = route[-2]
             self.start = route[-2]
 
-        waypoint = self._map.get_waypoint(carla.Location(self.states[wp][0], self.states[wp][2], 1.2))
+        waypoint = self._map.get_waypoint(carla.Location(self.states[wp][0].item(), self.states[wp][2].item(), 1.2))
 
         control = self._vehicle_controller.run_step(self._target_speed, self.current_speed, waypoint, self.current_location) # execute first step of plan
 
-        if debug: # draw plan
-            draw_waypoints(self._vehicle.get_world(), route, self._vehicle.get_location().z + 1.0)
+        # if debug: # draw plan
+        #     draw_waypoints(self._vehicle.get_world(), route)
+        return control

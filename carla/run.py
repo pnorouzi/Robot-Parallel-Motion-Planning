@@ -30,7 +30,7 @@ from agents.navigation.basic_agent import BasicAgent
 from cuda_agent import *
 from environment import *
 
-DEBUG = True
+DEBUG = False
 NUM_OBSTACLES = 20
 SPAWN_POINT_INDICES = [116,198]
 AGENT = 'cuda'
@@ -79,9 +79,10 @@ def game_loop(options_dict):
         segment= Camera(sensor_bp[1], sensor_transform, vehicle, agent)
 
         # add obstacles and get sample nodes
-        world.create_obstacles(options_dict['num_obstacles'])
+        # world.create_obstacles(options_dict['num_obstacles'])
 
         # run the simulation
+        print('Starting the simulation.')
         prev_location = vehicle.vehicle.get_location()
         sp = 2
         while True:
@@ -93,11 +94,12 @@ def game_loop(options_dict):
                 continue
 
             # wait for sensors to sync
-            while world_snapshot.frame_count!=depth.frame_n or world_snapshot.frame_count!=segment.frame_n:
-                time.sleep(0.05)
+            # while world_snapshot.frame_count!=depth.frame_n or world_snapshot.frame_count!=segment.frame_n:
+            #     time.sleep(0.05)
 
             # plan, get control inputs, and apply to vehicle
             control = agent.run_step(options_dict['debug'])
+            print(control)
             vehicle.vehicle.apply_control(control)
 
             # check if destination reached
