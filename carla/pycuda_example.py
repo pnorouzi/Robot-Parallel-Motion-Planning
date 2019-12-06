@@ -662,12 +662,12 @@ class GMT(object):
 
 
 def unitTest1():
-    states = np.array([[10,2,135*np.pi/180], [10,2,90*np.pi/180], [10,2,45*np.pi/180], # 0-2
-        [8,5,135*np.pi/180], [8,5,90*np.pi/180], [8,5,45*np.pi/180], # 3-5
-        [12,6,135*np.pi/180], [12,6,90*np.pi/180], [12,6,45*np.pi/180], # 6-8
-        [11,8,135*np.pi/180], [11,8,90*np.pi/180], [11,8,45*np.pi/180], # 9-11
-        [2,7,135*np.pi/180], [2,7,90*np.pi/180], [2,7,45*np.pi/180], # 12-14
-        [5,10,135*np.pi/180], [5,10,90*np.pi/180], [5,10,45*np.pi/180]]).astype(np.float32) #15-17
+    states = np.array([[10,2,45*np.pi/180], [10,2,0*np.pi/180], [10,2,-45*np.pi/180], # 0-2
+        [8,5,45*np.pi/180], [8,5,0*np.pi/180], [8,5,-45*np.pi/180], # 3-5
+        [12,6,45*np.pi/180], [12,6,0*np.pi/180], [12,6,-45*np.pi/180], # 6-8
+        [11,8,45*np.pi/180], [11,8,0*np.pi/180], [11,8,-45*np.pi/180], # 9-11
+        [2,7,45*np.pi/180], [2,7,0*np.pi/180], [2,7,-45*np.pi/180], # 12-14
+        [5,10,45*np.pi/180], [5,10,0*np.pi/180], [5,10,-45*np.pi/180]]).astype(np.float32) #15-17
 
     n0 = [3,4,5,6,7,8]
     n1 = [0,1,2,9,10,11,12,13,14,15,16,17]
@@ -765,21 +765,21 @@ def unitTest3():
     return route[::-1], states
 
 if __name__ == '__main__':
-    route, states = unitTest2()
+    route, states = unitTest1()
     print(route)
     print(states)
 
     x = states[:,0]
-    y = -states[:,1]
+    y = states[:,1]
     theta = states[:,2]
     u = np.cos(theta) 
-    v = np.sin(theta)
+    v = -np.sin(theta)
 
     x_r = states[route,0] 
-    y_r = -states[route,1]
+    y_r = states[route,1]
     theta_r = states[route,2]
     u_r = np.cos(theta_r) 
-    v_r = np.sin(theta_r)
+    v_r = -np.sin(theta_r)
 
     fig, ax = plt.subplots(nrows=2, ncols=1)
     ax[0].quiver(x,y,u,v)
