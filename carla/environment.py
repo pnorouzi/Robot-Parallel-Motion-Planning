@@ -60,8 +60,10 @@ class World(object):
         print(f'Creating {num_obstacles} obstacles.')
         obstacles = 0
         # continue randomly spawning obstacles until desired number reached
-        for i in range(num_obstacles):
+        while obstacles < num_obstacles:
             transform = random.choice(self.world.get_map().get_spawn_points())
+            # transform = self.map.get_spawn_points()[116]
+            # transform.location.x -= 35
             transform.rotation.yaw = random.randrange(-180.0, 180.0, 1.0) # get random yaw orientation so vehicles don't line up
 
             bp = random.choice(self.blueprint_library.filter('vehicle')) # random vehicle for fun

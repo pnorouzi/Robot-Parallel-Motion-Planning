@@ -58,7 +58,7 @@ class TestAgent(Agent):
         self._world = self._vehicle.get_world()
         self._map = self._vehicle.get_world().get_map()
 
-    def create_samples(self, start, goal, waypoint_dist = 2, disk_radius = 2*math.sqrt(2), num_yaw = 8):
+    def create_samples(self, start, goal, waypoint_dist = 4, disk_radius = 4*math.sqrt(2), num_yaw = 8):
         print(f'Creating samples {waypoint_dist}m apart with {num_yaw} yaw vaules and neighbors within {disk_radius}m.')
 
         wp = []
@@ -144,8 +144,40 @@ class TestAgent(Agent):
         self.radius = 2
         self.threshold  = 2
 
-        self.obstacles = np.array([[-1,-1,-1,-1]]).astype(np.float32)
-        self.num_obs = self.num_obs = np.array([0]).astype(np.int32)
+        # self.obstacles = np.array([[-1,-1,-1,-1]]).astype(np.float32)
+        # self.num_obs = self.num_obs = np.array([0]).astype(np.int32)
+
+        obstacles = []
+        print('length of  obstacle list', len(self._world.get_actors().filter('vehicle.*')))
+        for vehicle in self._world.get_actors().filter('vehicle.*'):
+                #print(vehicle.bounding_box)
+                # draw Box
+                bb_points = TestAgent._create_bb_points(vehicle)
+                global_points= TestAgent._vehicle_to_world(bb_points, vehicle)
+                global_points /= global_points[3,:]
+
+                my_bb_points = TestAgent._create_bb_points(self._vehicle)
+                my_global_points = TestAgent._vehicle_to_world(my_bb_points, self._vehicle)
+
+                my_global_points /= my_global_points[3,:]
+                # transform = vehicle.get_transform()
+                # bounding_box = vehicle.bounding_box
+                # bounding_box.location += transform.location
+                # my_location = self.current_location.location
+                dist = np.sqrt((my_global_points[0,2]-global_points[0,2])**2 + (my_global_points[1,2]-global_points[1,2])**2 + (my_global_points[2,2]-global_points[2,2])**2)
+
+                if 0<dist:
+                    vehicle_box = [global_points[0,0],global_points[1,0],global_points[0,1],global_points[1,1]]
+                    obstacles.append(vehicle_box)
+                    print(f'vehicle box: {vehicle_box}')
+
+        print('number of near obstacles: ', len(obstacles))
+        if len(obstacles) == 0:
+            self.obstacles = np.array([[-1,-1,-1,-1]]).astype(np.float32)
+            self.num_obs = self.num_obs = np.array([0]).astype(np.int32)
+        else:
+            self.obstacles = np.array(obstacles).astype(np.float32)
+            self.num_obs = self.num_obs = np.array([self.obstacles.shape[0]]).astype(np.int32)
 
         iter_parameters = {'start':self.start, 'goal':self.goal, 'radius':self.radius, 'threshold':self.threshold, 'obstacles':self.obstacles, 'num_obs':self.num_obs}
         
@@ -222,8 +254,8 @@ class TestAgent(Agent):
         cords = np.zeros((3, 4))
         extent = vehicle.bounding_box.extent
 
-        cords[0, :] = np.array([extent.x, extent.y, extent.z, 1])
-        cords[1, :] = np.array([-extent.x, -extent.y, extent.z, 1])
+        cords[0, :] = np.array([extent.x + 2, extent.y + 2, extent.z, 1])
+        cords[1, :] = np.array([-extent.x - 2, -extent.y - 2, extent.z, 1])
         cords[2, :] = np.array([0, 0, 0, 1])    # center
 
         return cords

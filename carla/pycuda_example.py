@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 
 mod = SourceModule("""
     #include <stdio.h>
+    #define ZERO 1e-10
 
     __device__ bool check_col(float *y_vals,float *x_vals,float *obstacles, int num_obs){
         if (num_obs==0){
@@ -36,395 +37,422 @@ mod = SourceModule("""
         return false;
     }
 
-    __device__ void RSRcost(float *curCost, float *parentCost, float *point1,float *point2, int r_min, float *obstacles, int num_obs){
-        float PI = 3.141592653589793;
+    __device__ void RSRcost(float *curCost, float *parentCost, float *point1,float *point2, int r_min, float *obstacles, int num_obs)
+    {
+    float PI = 3.141592653589793;
 
-        float p_c1 [2] = { point1[0] + (r_min * cosf(point1[2] - PI/2)), point1[1] + (r_min * sinf(point1[2] - PI/2))}; 
-        float p_c2 [2] = { point2[0] + (r_min * cosf(point2[2] - PI/2)), point2[1] + (r_min * sinf(point2[2] - PI/2))};
+    float p_c1 [2] = { point1[0] + (r_min * cosf(point1[2] - PI/2)), point1[1] + (r_min * sinf(point1[2] - PI/2))}; 
+    float p_c2 [2] = { point2[0] + (r_min * cosf(point2[2] - PI/2)), point2[1] + (r_min * sinf(point2[2] - PI/2))};
 
-        float r_1 = sqrtf(powf(p_c1[0]-point1[0],2.0) + powf(p_c1[1]-point1[1],2.0));
-        float r_2 = sqrtf(powf(p_c2[0]-point2[0],2.0) + powf(p_c2[1]-point2[1],2.0));
+    float r_1 = sqrtf(powf(p_c1[0]-point1[0],2.0) + powf(p_c1[1]-point1[1],2.0));
+    float r_2 = sqrtf(powf(p_c2[0]-point2[0],2.0) + powf(p_c2[1]-point2[1],2.0));
 
-        float V1 [2] = {p_c2[0]-p_c1[0],p_c2[1]-p_c1[1]};
+    float V1 [2] = {p_c2[0]-p_c1[0],p_c2[1]-p_c1[1]};
 
-        float dist_centers = sqrtf(powf(V1[0],2) + powf(V1[1],2));
+    float dist_centers = sqrtf(powf(V1[0],2) + powf(V1[1],2));
 
-        float c = (r_1-r_2)/dist_centers;
-        V1[0] /= dist_centers;
-        V1[1] /= dist_centers;
+    float c = (r_1-r_2)/dist_centers;
+    V1[0] /= dist_centers;
+    V1[1] /= dist_centers;
 
-        float normal [2] = {(V1[0]*c)-(V1[1]*sqrtf(1-powf(c,2))),(V1[0]*sqrtf(1-powf(c,2)))+(V1[1]*c)};
+    float normal [2] = {(V1[0]*c)-(V1[1]*sqrtf(1-powf(c,2))),(V1[0]*sqrtf(1-powf(c,2)))+(V1[1]*c)};
 
-        if (isnan(normal[0])){
-            return;
-        }
-
-        float tangent_1 [2] = {p_c1[0] + (r_1* normal[0]),p_c1[1] + (r_1* normal[1])};
-        float tangent_2 [2] = {p_c2[0] + (r_2* normal[0]),p_c2[1] + (r_2* normal[1])};
-
-        float V2 [2] = {tangent_2[0]-tangent_1[0],tangent_2[1]-tangent_1[1]};
-
-        float p2_h [2] = {point1[0], point1[1]};
-        float v1 [2] = {p2_h[0]-p_c1[0], p2_h[1]-p_c1[1]};
-        float v2 [2] = {tangent_1[0]-p_c1[0], tangent_1[1]-p_c1[1]};
-
-        float theta_1 = atan2f(v2[1],v2[0]) - atan2f(v1[1],v1[0]);
-
-        if (theta_1>0){
-            theta_1-=(PI*2);
-        }
-
-        float angle = point1[2] + (PI/2);
-
-        float x_vals [150] = { };
-        float y_vals [150] = { };
-        float d_theta = theta_1/49;
-
-        for (int i=0;i<50;i++){
-            x_vals[i] = (abs(r_1) * cosf(angle+(i*d_theta))) + p_c1[0];
-            y_vals[i] = (abs(r_1) * sinf(angle+(i*d_theta))) + p_c1[1];
-        }
-
-        float p3_h [2] = {point2[0], point2[1]};
-        v1[0] = tangent_2[0]-p_c2[0];
-        v1[1] = tangent_2[1]-p_c2[1];
-
-        v2[0] = p3_h[0] - p_c2[0];
-        v2[1] = p3_h[1] - p_c2[1];
-
-        float theta_2 = atan2f(v2[1],v2[0]) - atan2f(v1[1],v1[0]);
-
-
-        if (theta_2>0){
-            theta_2-=(PI*2);
-        }
-
-        angle = atan2f((tangent_2[1]-p_c2[1]),(tangent_2[0]-p_c2[0]));
-
-        d_theta = theta_2/49;
-
-        for (int i=0;i<50;i++){
-            x_vals[i+100] = (abs(r_2) * cosf(angle+(i*d_theta))) + p_c2[0];
-            y_vals[i+100] = (abs(r_2) * sinf(angle+(i*d_theta))) + p_c2[1];
-        }
-
-        float d_x = (x_vals[100] - x_vals[49])/49;
-        float d_y = (y_vals[100] - y_vals[49])/49;
-
-        for (int i=0;i<50;i++){
-            x_vals[i+50] = x_vals[49] + (i*d_x);
-            y_vals[i+50] = y_vals[49] + (i*d_y);
-        }
-
-        // checks for collision
-
-        bool collision = check_col(y_vals,x_vals,obstacles,num_obs);
-
-        if (collision){
-            return;
-        }
-
-        float cost = abs((r_1*theta_1)) + abs((r_2*theta_2)) + sqrtf(powf(V2[0],2) + powf(V2[1],2));
-        cost += *parentCost;
-
-        if (cost> *curCost){
-            return;
-        }
-
-        *curCost = cost;
-        return;
+    if (isnan(normal[0])){
+    return;
     }
 
-    __device__ void LSLcost(float *curCost, float *parentCost, float *point1,float *point2, int r_min, float *obstacles, int num_obs){
-        float PI = 3.141592653589793;
+    float tangent_1 [2] = {p_c1[0] + (r_1* normal[0]),p_c1[1] + (r_1* normal[1])};
+    float tangent_2 [2] = {p_c2[0] + (r_2* normal[0]),p_c2[1] + (r_2* normal[1])};
 
-        float p_c1 [2] = { point1[0] + (r_min * cosf(point1[2] + PI/2)), point1[1] + (r_min * sinf(point1[2] + PI/2))}; 
-        float p_c2 [2] = { point2[0] + (r_min * cosf(point2[2] + PI/2)), point2[1] + (r_min * sinf(point2[2] + PI/2))};
+    float V2 [2] = {tangent_2[0]-tangent_1[0],tangent_2[1]-tangent_1[1]};
 
-        float r_1 = -1.0 * sqrtf(powf(p_c1[0]-point1[0],2.0) + powf(p_c1[1]-point1[1],2.0));
-        float r_2 = -1.0 * sqrtf(powf(p_c2[0]-point2[0],2.0) + powf(p_c2[1]-point2[1],2.0));
 
-        float V1 [2] = {p_c2[0]-p_c1[0],p_c2[1]-p_c1[1]};
+    float p2_h [2] = {point1[0], point1[1]};
+    float v1 [2] = {p2_h[0]-p_c1[0], p2_h[1]-p_c1[1]};
+    float v2 [2] = {tangent_1[0]-p_c1[0], tangent_1[1]-p_c1[1]};
 
-        float dist_centers = sqrtf(powf(V1[0],2) + powf(V1[1],2));
+    float theta_1 = atan2f(v2[1],v2[0]) - atan2f(v1[1],v1[0]);
 
-        float c = (r_1-r_2)/dist_centers;
-        V1[0] /= dist_centers;
-        V1[1] /= dist_centers;
-
-        float normal [2] = {(V1[0]*c)-(V1[1]*sqrtf(1-powf(c,2))),(V1[0]*sqrtf(1-powf(c,2)))+(V1[1]*c)};
-
-        if (isnan(normal[0])){
-            return;
-        }
-
-        float tangent_1 [2] = {p_c1[0] + (r_1* normal[0]),p_c1[1] + (r_1* normal[1])};
-        float tangent_2 [2] = {p_c2[0] + (r_2* normal[0]),p_c2[1] + (r_2* normal[1])};
-
-        float V2 [2] = {tangent_2[0]-tangent_1[0],tangent_2[1]-tangent_1[1]};
-
-        float p2_h [2] = {point1[0], point1[1]};
-        float v1 [2] = {p2_h[0]-p_c1[0], p2_h[1]-p_c1[1]};
-        float v2 [2] = {tangent_1[0]-p_c1[0], tangent_1[1]-p_c1[1]};
-
-        float theta_1 = atan2f(v2[1],v2[0]) - atan2f(v1[1],v1[0]);
-
-        if (theta_1<0){
-            theta_1+=(PI*2);
-        }
-
-        float angle = point1[2] - (PI/2);
-
-        float x_vals [150] = { };
-        float y_vals [150] = { };
-        float d_theta = theta_1/49;
-
-        for (int i=0;i<50;i++){
-            x_vals[i] = (abs(r_1) * cosf(angle+(i*d_theta))) + p_c1[0];
-            y_vals[i] = (abs(r_1) * sinf(angle+(i*d_theta))) + p_c1[1];
-        }
-
-        float p3_h [2] = {point2[0], point2[1]};
-        v1[0] = tangent_2[0]-p_c2[0];
-        v1[1] = tangent_2[1]-p_c2[1];
-
-        v2[0] = p3_h[0] - p_c2[0];
-        v2[1] = p3_h[1] - p_c2[1];
-
-        float theta_2 = atan2f(v2[1],v2[0]) - atan2f(v1[1],v1[0]);
-
-        if (theta_2<0){
-            theta_2+=(PI*2);
-        }
-        angle = atan2f((tangent_2[1]-p_c2[1]),(tangent_2[0]-p_c2[0]));
-
-        d_theta = theta_2/49;
-
-        for (int i=0;i<50;i++){
-            x_vals[i+100] = (abs(r_2) * cosf(angle+(i*d_theta))) + p_c2[0];
-            y_vals[i+100] = (abs(r_2) * sinf(angle+(i*d_theta))) + p_c2[1];
-        }
-
-        float d_x = (x_vals[100] - x_vals[49])/49;
-        float d_y = (y_vals[100] - y_vals[49])/49;
-
-        for (int i=0;i<50;i++){
-            x_vals[i+50] = x_vals[49] + (i*d_x);
-            y_vals[i+50] = y_vals[49] + (i*d_y);
-        }
-
-        bool collision = check_col(y_vals,x_vals,obstacles,num_obs);
-
-        if (collision){
-            return;
-        }
-
-        float cost = abs((r_1*theta_1)) + abs((r_2*theta_2)) + sqrtf(powf(V2[0],2) + powf(V2[1],2));
-        cost += *parentCost;
-
-        if (cost> *curCost){
-            return;
-        }
-
-        *curCost = cost;
-        return;
+    if (theta_1>0.0000001){
+    theta_1-=(PI*2);
     }
 
-    __device__ void LSRcost(float *curCost, float *parentCost, float *point1,float *point2, int r_min, float *obstacles, int num_obs){
-        float PI = 3.141592653589793;
+    float angle = point1[2] + (PI/2);
 
-        float p_c1 [2] = { point1[0] + (r_min * cosf(point1[2] + PI/2)), point1[1] + (r_min * sinf(point1[2] + PI/2))}; 
-        float p_c2 [2] = { point2[0] + (r_min * cosf(point2[2] - PI/2)), point2[1] + (r_min * sinf(point2[2] - PI/2))};
+    float x_vals [150] = { };
+    float y_vals [150] = { };
+    float d_theta = theta_1/49;
 
-        float r_1 = -1.0 * sqrtf(powf(p_c1[0]-point1[0],2.0) + powf(p_c1[1]-point1[1],2.0));
-        float r_2 = sqrtf(powf(p_c2[0]-point2[0],2.0) + powf(p_c2[1]-point2[1],2.0));
-
-        float V1 [2] = {p_c2[0]-p_c1[0],p_c2[1]-p_c1[1]};
-
-        float dist_centers = sqrtf(powf(V1[0],2) + powf(V1[1],2));
-
-        float c = (r_1-r_2)/dist_centers;
-        V1[0] /= dist_centers;
-        V1[1] /= dist_centers;
-
-        float normal [2] = {(V1[0]*c)-(V1[1]*sqrtf(1-powf(c,2))),(V1[0]*sqrtf(1-powf(c,2)))+(V1[1]*c)};
-
-        if (isnan(normal[0])){
-            return;
-        }
-
-        float tangent_1 [2] = {p_c1[0] + (r_1* normal[0]),p_c1[1] + (r_1* normal[1])};
-        float tangent_2 [2] = {p_c2[0] + (r_2* normal[0]),p_c2[1] + (r_2* normal[1])};
-
-        float V2 [2] = {tangent_2[0]-tangent_1[0],tangent_2[1]-tangent_1[1]};
-
-        float p2_h [2] = {point1[0], point1[1]};
-        float v1 [2] = {p2_h[0]-p_c1[0], p2_h[1]-p_c1[1]};
-        float v2 [2] = {tangent_1[0]-p_c1[0], tangent_1[1]-p_c1[1]};
-
-        float theta_1 = atan2f(v2[1],v2[0]) - atan2f(v1[1],v1[0]);
-
-        if (theta_1<0){
-            theta_1+=(PI*2);
-        }
-
-        float angle = point1[2] - (PI/2);
-
-        float x_vals [150] = { };
-        float y_vals [150] = { };
-        float d_theta = theta_1/49;
-
-        for (int i=0;i<50;i++){
-            x_vals[i] = (abs(r_1) * cosf(angle+(i*d_theta))) + p_c1[0];
-            y_vals[i] = (abs(r_1) * sinf(angle+(i*d_theta))) + p_c1[1];
-        }
-
-
-        float p3_h [2] = {point2[0], point2[1]};
-        v1[0] = tangent_2[0]-p_c2[0];
-        v1[1] = tangent_2[1]-p_c2[1];
-
-        v2[0] = p3_h[0] - p_c2[0];
-        v2[1] = p3_h[1] - p_c2[1];
-
-        float theta_2 = atan2f(v2[1],v2[0]) - atan2f(v1[1],v1[0]);
-
-        if (theta_2>0){
-            theta_2-=(PI*2);
-        }
-
-        angle = atan2f((tangent_2[1]-p_c2[1]),(tangent_2[0]-p_c2[0]));
-
-        d_theta = theta_2/49;
-
-        for (int i=0;i<50;i++){
-            x_vals[i+100] = (abs(r_2) * cosf(angle+(i*d_theta))) + p_c2[0];
-            y_vals[i+100] = (abs(r_2) * sinf(angle+(i*d_theta))) + p_c2[1];
-        }
-
-        float d_x = (x_vals[100] - x_vals[49])/49;
-        float d_y = (y_vals[100] - y_vals[49])/49;
-
-        for (int i=0;i<50;i++){
-            x_vals[i+50] = x_vals[49] + (i*d_x);
-            y_vals[i+50] = y_vals[49] + (i*d_y);
-        }
-
-        bool collision = check_col(y_vals,x_vals,obstacles,num_obs);
-
-        if (collision){
-            return;
-        }
-
-        float cost = abs((r_1*theta_1)) + abs((r_2*theta_2)) + sqrtf(powf(V2[0],2) + powf(V2[1],2));
-        cost += *parentCost;
-
-        if (cost> *curCost){
-            return;
-        }
-
-        *curCost = cost;
-        return;
+    for (int i=0;i<50;i++)
+    {
+    x_vals[i] = (abs(r_1) * cosf(angle+(i*d_theta))) + p_c1[0];
+    y_vals[i] = (abs(r_1) * sinf(angle+(i*d_theta))) + p_c1[1];
     }
 
-    __device__ void RSLcost(float *curCost, float *parentCost, float *point1, float *point2, int r_min, float *obstacles, int num_obs){
-        float PI = 3.141592653589793;
 
-        float p_c1 [2] = { point1[0] + (r_min * cosf(point1[2] - PI/2)), point1[1] + (r_min * sinf(point1[2] - PI/2))}; 
-        float p_c2 [2] = { point2[0] + (r_min * cosf(point2[2] + PI/2)), point2[1] + (r_min * sinf(point2[2] + PI/2))};
+    float p3_h [2] = {point2[0], point2[1]};
+    v1[0] = tangent_2[0]-p_c2[0];
+    v1[1] = tangent_2[1]-p_c2[1];
 
-        float r_1 = sqrtf(powf(p_c1[0]-point1[0],2.0) + powf(p_c1[1]-point1[1],2.0));
-        float r_2 = -1.0 * sqrtf(powf(p_c2[0]-point2[0],2.0) + powf(p_c2[1]-point2[1],2.0));
+    v2[0] = p3_h[0] - p_c2[0];
+    v2[1] = p3_h[1] - p_c2[1];
 
-        float V1 [2] = {p_c2[0]-p_c1[0],p_c2[1]-p_c1[1]};
+    float theta_2 = atan2f(v2[1],v2[0]) - atan2f(v1[1],v1[0]);
 
-        float dist_centers = sqrtf(powf(V1[0],2) + powf(V1[1],2));
 
-        float c = (r_1-r_2)/dist_centers;
-        V1[0] /= dist_centers;
-        V1[1] /= dist_centers;
+    if (theta_2>0.0000001){
+    theta_2-=(PI*2);
+    }
 
-        float normal [2] = {(V1[0]*c)-(V1[1]*sqrtf(1-powf(c,2))),(V1[0]*sqrtf(1-powf(c,2)))+(V1[1]*c)};
+    angle = atan2f((tangent_2[1]-p_c2[1]),(tangent_2[0]-p_c2[0]));
 
-        if (isnan(normal[0])){
-            return;
-        }
+    //printf ("theta_2 %4.8f\\n",theta_2);
+    d_theta = theta_2/49;
 
-        float tangent_1 [2] = {p_c1[0] + (r_1* normal[0]),p_c1[1] + (r_1* normal[1])};
-        float tangent_2 [2] = {p_c2[0] + (r_2* normal[0]),p_c2[1] + (r_2* normal[1])};
+    for (int i=0;i<50;i++)
+    {
+    x_vals[i+100] = (abs(r_2) * cosf(angle+(i*d_theta))) + p_c2[0];
+    y_vals[i+100] = (abs(r_2) * sinf(angle+(i*d_theta))) + p_c2[1];
+    }
 
-        float V2 [2] = {tangent_2[0]-tangent_1[0],tangent_2[1]-tangent_1[1]};
+    float d_x = (x_vals[100] - x_vals[49])/49;
+    float d_y = (y_vals[100] - y_vals[49])/49;
 
-        float p2_h [2] = {point1[0], point1[1]};
-        float v1 [2] = {p2_h[0]-p_c1[0], p2_h[1]-p_c1[1]};
-        float v2 [2] = {tangent_1[0]-p_c1[0], tangent_1[1]-p_c1[1]};
+    for (int i=0;i<50;i++)
+    {
+    x_vals[i+50] = x_vals[49] + (i*d_x);
+    y_vals[i+50] = y_vals[49] + (i*d_y);
+    }
 
-        float theta_1 = atan2f(v2[1],v2[0]) - atan2f(v1[1],v1[0]);
+    // checks for collision
 
-        if (theta_1>0){
-            theta_1-=(PI*2);
-        }
+    bool collision = check_col(y_vals,x_vals,obstacles,num_obs);
 
-        float angle = point1[2] + (PI/2);
 
-        float x_vals [150] = { };
-        float y_vals [150] = { };
-        float d_theta = theta_1/49;
+    if (collision){
+    return;
+    }
 
-        for (int i=0;i<50;i++){
-            x_vals[i] = (abs(r_1) * cosf(angle+(i*d_theta))) + p_c1[0];
-            y_vals[i] = (abs(r_1) * sinf(angle+(i*d_theta))) + p_c1[1];
-        }
 
-        float p3_h [2] = {point2[0], point2[1]};
-        v1[0] = tangent_2[0]-p_c2[0];
-        v1[1] = tangent_2[1]-p_c2[1];
+    float cost = abs((r_1*theta_1)) + abs((r_2*theta_2)) + sqrtf(powf(V2[0],2) + powf(V2[1],2));
+    //printf ("cost %f, point1 %f %f %f, point2 %f %f %f\\n", cost, point1[0], point1[1],point1[2], point2[0], point2[1], point2[2]);
 
-        v2[0] = p3_h[0] - p_c2[0];
-        v2[1] = p3_h[1] - p_c2[1];
+    if (cost> *curCost){
+    return;
+    }
 
-        float theta_2 = atan2f(v2[1],v2[0]) - atan2f(v1[1],v1[0]);
+    *curCost = cost;
+    return;
+    }
 
-        if (theta_2<0){
-            theta_2+=(PI*2);
-        }
+    __device__ void LSLcost(float *curCost, float *parentCost, float *point1,float *point2, int r_min, float *obstacles, int num_obs)
+    {
+    float PI = 3.141592653589793;
 
-        angle = atan2f((tangent_2[1]-p_c2[1]),(tangent_2[0]-p_c2[0]));
+    float p_c1 [2] = { point1[0] + (r_min * cosf(point1[2] + PI/2)), point1[1] + (r_min * sinf(point1[2] + PI/2))}; 
+    float p_c2 [2] = { point2[0] + (r_min * cosf(point2[2] + PI/2)), point2[1] + (r_min * sinf(point2[2] + PI/2))};
 
-        d_theta = theta_2/49;
+    float r_1 = -1.0 * sqrtf(powf(p_c1[0]-point1[0],2.0) + powf(p_c1[1]-point1[1],2.0));
+    float r_2 = -1.0 * sqrtf(powf(p_c2[0]-point2[0],2.0) + powf(p_c2[1]-point2[1],2.0));
 
-        for (int i=0;i<50;i++){
-            x_vals[i+100] = (abs(r_2) * cosf(angle+(i*d_theta))) + p_c2[0];
-            y_vals[i+100] = (abs(r_2) * sinf(angle+(i*d_theta))) + p_c2[1];
-        }
+    float V1 [2] = {p_c2[0]-p_c1[0],p_c2[1]-p_c1[1]};
 
-        float d_x = (x_vals[100] - x_vals[49])/49;
-        float d_y = (y_vals[100] - y_vals[49])/49;
+    float dist_centers = sqrtf(powf(V1[0],2) + powf(V1[1],2));
 
-        for (int i=0;i<50;i++){
-            x_vals[i+50] = x_vals[49] + (i*d_x);
-            y_vals[i+50] = y_vals[49] + (i*d_y);
-        }
+    float c = (r_1-r_2)/dist_centers;
+    V1[0] /= dist_centers;
+    V1[1] /= dist_centers;
 
-        bool collision = check_col(y_vals,x_vals,obstacles,num_obs);
+    float normal [2] = {(V1[0]*c)-(V1[1]*sqrtf(1-powf(c,2))),(V1[0]*sqrtf(1-powf(c,2)))+(V1[1]*c)};
 
-        if (collision){
-            return;
-        }
+    if (isnan(normal[0])){
+    return;
+    }
 
-        float cost = abs((r_1*theta_1)) + abs((r_2*theta_2)) + sqrtf(powf(V2[0],2) + powf(V2[1],2));
-        cost += *parentCost;
+    float tangent_1 [2] = {p_c1[0] + (r_1* normal[0]),p_c1[1] + (r_1* normal[1])};
+    float tangent_2 [2] = {p_c2[0] + (r_2* normal[0]),p_c2[1] + (r_2* normal[1])};
 
-        if (cost > *curCost){
-            return;
-        }
+    float V2 [2] = {tangent_2[0]-tangent_1[0],tangent_2[1]-tangent_1[1]};
 
-        *curCost = cost;
-        return;
+
+    float p2_h [2] = {point1[0], point1[1]};
+    float v1 [2] = {p2_h[0]-p_c1[0], p2_h[1]-p_c1[1]};
+    float v2 [2] = {tangent_1[0]-p_c1[0], tangent_1[1]-p_c1[1]};
+
+    float theta_1 = atan2f(v2[1],v2[0]) - atan2f(v1[1],v1[0]);
+
+    if (theta_1<-0.0000001){
+    theta_1+=(PI*2);
+    }
+
+    float angle = point1[2] - (PI/2);
+
+    float x_vals [150] = { };
+    float y_vals [150] = { };
+    float d_theta = theta_1/49;
+
+    for (int i=0;i<50;i++)
+    {
+    x_vals[i] = (abs(r_1) * cosf(angle+(i*d_theta))) + p_c1[0];
+    y_vals[i] = (abs(r_1) * sinf(angle+(i*d_theta))) + p_c1[1];
+    }
+
+
+
+    float p3_h [2] = {point2[0], point2[1]};
+    v1[0] = tangent_2[0]-p_c2[0];
+    v1[1] = tangent_2[1]-p_c2[1];
+
+    v2[0] = p3_h[0] - p_c2[0];
+    v2[1] = p3_h[1] - p_c2[1];
+
+    float theta_2 = atan2f(v2[1],v2[0]) - atan2f(v1[1],v1[0]);
+
+
+    if (theta_2<-0.0000001){
+    theta_2+=(PI*2);
+    }
+    angle = atan2f((tangent_2[1]-p_c2[1]),(tangent_2[0]-p_c2[0]));
+
+    d_theta = theta_2/49;
+    //printf ("d_theta %4.8f\\n",d_theta);
+
+    for (int i=0;i<50;i++)
+    {
+    x_vals[i+100] = (abs(r_2) * cosf(angle+(i*d_theta))) + p_c2[0];
+    y_vals[i+100] = (abs(r_2) * sinf(angle+(i*d_theta))) + p_c2[1];
+    }
+
+    float d_x = (x_vals[100] - x_vals[49])/49;
+    float d_y = (y_vals[100] - y_vals[49])/49;
+
+    for (int i=0;i<50;i++)
+    {
+    x_vals[i+50] = x_vals[49] + (i*d_x);
+    y_vals[i+50] = y_vals[49] + (i*d_y);
+    }
+
+
+    bool collision = check_col(y_vals,x_vals,obstacles,num_obs);
+
+    if (collision){
+    return;
+    }
+
+
+    float cost = abs((r_1*theta_1)) + abs((r_2*theta_2)) + sqrtf(powf(V2[0],2) + powf(V2[1],2));
+
+    if (cost> *curCost){
+    return;
+    }
+
+    *curCost = cost;
+    return;
+    }
+
+    __device__ void LSRcost(float *curCost, float *parentCost, float *point1,float *point2, int r_min, float *obstacles, int num_obs)
+    {
+    float PI = 3.141592653589793;
+
+    float p_c1 [2] = { point1[0] + (r_min * cosf(point1[2] + PI/2)), point1[1] + (r_min * sinf(point1[2] + PI/2))}; 
+    float p_c2 [2] = { point2[0] + (r_min * cosf(point2[2] - PI/2)), point2[1] + (r_min * sinf(point2[2] - PI/2))};
+
+    float r_1 = -1.0 * sqrtf(powf(p_c1[0]-point1[0],2.0) + powf(p_c1[1]-point1[1],2.0));
+    float r_2 = sqrtf(powf(p_c2[0]-point2[0],2.0) + powf(p_c2[1]-point2[1],2.0));
+
+    float V1 [2] = {p_c2[0]-p_c1[0],p_c2[1]-p_c1[1]};
+
+    float dist_centers = sqrtf(powf(V1[0],2) + powf(V1[1],2));
+
+    float c = (r_1-r_2)/dist_centers;
+    V1[0] /= dist_centers;
+    V1[1] /= dist_centers;
+
+    float normal [2] = {(V1[0]*c)-(V1[1]*sqrtf(1-powf(c,2))),(V1[0]*sqrtf(1-powf(c,2)))+(V1[1]*c)};
+
+    if (isnan(normal[0])){
+    return;
+    }
+
+    float tangent_1 [2] = {p_c1[0] + (r_1* normal[0]),p_c1[1] + (r_1* normal[1])};
+    float tangent_2 [2] = {p_c2[0] + (r_2* normal[0]),p_c2[1] + (r_2* normal[1])};
+
+    float V2 [2] = {tangent_2[0]-tangent_1[0],tangent_2[1]-tangent_1[1]};
+
+
+    float p2_h [2] = {point1[0], point1[1]};
+    float v1 [2] = {p2_h[0]-p_c1[0], p2_h[1]-p_c1[1]};
+    float v2 [2] = {tangent_1[0]-p_c1[0], tangent_1[1]-p_c1[1]};
+
+    float theta_1 = atan2f(v2[1],v2[0]) - atan2f(v1[1],v1[0]);
+
+    if (theta_1<-0.0000001){
+    theta_1+=(PI*2);
+    }
+
+    float angle = point1[2] - (PI/2);
+
+    float x_vals [150] = { };
+    float y_vals [150] = { };
+    float d_theta = theta_1/49;
+
+    for (int i=0;i<50;i++)
+    {
+    x_vals[i] = (abs(r_1) * cosf(angle+(i*d_theta))) + p_c1[0];
+    y_vals[i] = (abs(r_1) * sinf(angle+(i*d_theta))) + p_c1[1];
+    }
+
+
+    float p3_h [2] = {point2[0], point2[1]};
+    v1[0] = tangent_2[0]-p_c2[0];
+    v1[1] = tangent_2[1]-p_c2[1];
+
+    v2[0] = p3_h[0] - p_c2[0];
+    v2[1] = p3_h[1] - p_c2[1];
+
+    float theta_2 = atan2f(v2[1],v2[0]) - atan2f(v1[1],v1[0]);
+
+    if (theta_2>0.0000001){
+    theta_2-=(PI*2);
+    }
+
+    angle = atan2f((tangent_2[1]-p_c2[1]),(tangent_2[0]-p_c2[0]));
+
+    d_theta = theta_2/49;
+
+    for (int i=0;i<50;i++)
+    {
+    x_vals[i+100] = (abs(r_2) * cosf(angle+(i*d_theta))) + p_c2[0];
+    y_vals[i+100] = (abs(r_2) * sinf(angle+(i*d_theta))) + p_c2[1];
+    }
+
+    float d_x = (x_vals[100] - x_vals[49])/49;
+    float d_y = (y_vals[100] - y_vals[49])/49;
+
+    for (int i=0;i<50;i++)
+    {
+    x_vals[i+50] = x_vals[49] + (i*d_x);
+    y_vals[i+50] = y_vals[49] + (i*d_y);
+    }
+
+    bool collision = check_col(y_vals,x_vals,obstacles,num_obs);
+
+    if (collision){
+    return;
+    }
+
+    float cost = abs((r_1*theta_1)) + abs((r_2*theta_2)) + sqrtf(powf(V2[0],2) + powf(V2[1],2));
+
+    if (cost> *curCost){
+    return;
+    }
+
+    *curCost = cost;
+    return;
+    }
+
+    __device__ void RSLcost(float *curCost, float *parentCost, float *point1,float *point2, int r_min, float *obstacles, int num_obs)
+    {
+    float PI = 3.141592653589793;
+
+    float p_c1 [2] = { point1[0] + (r_min * cosf(point1[2] - PI/2)), point1[1] + (r_min * sinf(point1[2] - PI/2))}; 
+    float p_c2 [2] = { point2[0] + (r_min * cosf(point2[2] + PI/2)), point2[1] + (r_min * sinf(point2[2] + PI/2))};
+
+    float r_1 = sqrtf(powf(p_c1[0]-point1[0],2.0) + powf(p_c1[1]-point1[1],2.0));
+    float r_2 = -1.0 * sqrtf(powf(p_c2[0]-point2[0],2.0) + powf(p_c2[1]-point2[1],2.0));
+
+    float V1 [2] = {p_c2[0]-p_c1[0],p_c2[1]-p_c1[1]};
+
+    float dist_centers = sqrtf(powf(V1[0],2) + powf(V1[1],2));
+
+    float c = (r_1-r_2)/dist_centers;
+    V1[0] /= dist_centers;
+    V1[1] /= dist_centers;
+
+    float normal [2] = {(V1[0]*c)-(V1[1]*sqrtf(1-powf(c,2))),(V1[0]*sqrtf(1-powf(c,2)))+(V1[1]*c)};
+
+    if (isnan(normal[0])){
+    return;
+    }
+
+    float tangent_1 [2] = {p_c1[0] + (r_1* normal[0]),p_c1[1] + (r_1* normal[1])};
+    float tangent_2 [2] = {p_c2[0] + (r_2* normal[0]),p_c2[1] + (r_2* normal[1])};
+
+    float V2 [2] = {tangent_2[0]-tangent_1[0],tangent_2[1]-tangent_1[1]};
+
+    float p2_h [2] = {point1[0], point1[1]};
+    float v1 [2] = {p2_h[0]-p_c1[0], p2_h[1]-p_c1[1]};
+    float v2 [2] = {tangent_1[0]-p_c1[0], tangent_1[1]-p_c1[1]};
+
+    float theta_1 = atan2f(v2[1],v2[0]) - atan2f(v1[1],v1[0]);
+
+    if (theta_1>0.0000001){
+    theta_1-=(PI*2);
+    }
+
+    float angle = point1[2] + (PI/2);
+
+    float x_vals [150] = { };
+    float y_vals [150] = { };
+    float d_theta = theta_1/49;
+
+    for (int i=0;i<50;i++)
+    {
+    x_vals[i] = (abs(r_1) * cosf(angle+(i*d_theta))) + p_c1[0];
+    y_vals[i] = (abs(r_1) * sinf(angle+(i*d_theta))) + p_c1[1];
+    }
+
+
+    float p3_h [2] = {point2[0], point2[1]};
+    v1[0] = tangent_2[0]-p_c2[0];
+    v1[1] = tangent_2[1]-p_c2[1];
+
+    v2[0] = p3_h[0] - p_c2[0];
+    v2[1] = p3_h[1] - p_c2[1];
+
+    float theta_2 = atan2f(v2[1],v2[0]) - atan2f(v1[1],v1[0]);
+
+    if (theta_2<-0.0000001){
+    theta_2+=(PI*2);
+    }
+
+    angle = atan2f((tangent_2[1]-p_c2[1]),(tangent_2[0]-p_c2[0]));
+
+    d_theta = theta_2/49;
+
+    for (int i=0;i<50;i++)
+    {
+    x_vals[i+100] = (abs(r_2) * cosf(angle+(i*d_theta))) + p_c2[0];
+    y_vals[i+100] = (abs(r_2) * sinf(angle+(i*d_theta))) + p_c2[1];
+    }
+
+    float d_x = (x_vals[100] - x_vals[49])/49;
+    float d_y = (y_vals[100] - y_vals[49])/49;
+
+    for (int i=0;i<50;i++)
+    {
+    x_vals[i+50] = x_vals[49] + (i*d_x);
+    y_vals[i+50] = y_vals[49] + (i*d_y);
+    }
+
+    bool collision = check_col(y_vals,x_vals,obstacles,num_obs);
+
+    if (collision){
+    return;
+    }
+
+    float cost = abs((r_1*theta_1)) + abs((r_2*theta_2)) + sqrtf(powf(V2[0],2) + powf(V2[1],2));
+
+    if (cost > *curCost){
+    return;
+    }
+
+    *curCost = cost;
+    return;
     }
 
     __device__ bool computeDubinsCost(float &cost, float &parentCost, float *end_point, float *start_point, float r_min, float *obstacles, int num_obs){
-        float curCost = cost;
+        float curCost = 9999999999.9;
 
         RSRcost(&curCost, &parentCost, start_point, end_point, r_min, obstacles, num_obs);
         LSLcost(&curCost, &parentCost, start_point, end_point, r_min, obstacles, num_obs);
@@ -432,7 +460,12 @@ mod = SourceModule("""
         RSLcost(&curCost, &parentCost, start_point, end_point, r_min, obstacles, num_obs);
 
 
+        curCost += parentCost;
         bool connected = curCost < cost;
+
+
+        printf("start: %f, %f, %f end: %f, %f, %f cost: %f, parent cost: %f, connected: %i\\n", start_point[0], start_point[1], start_point[2], end_point[0], end_point[1], end_point[2], curCost, parentCost, connected);
+
         cost = connected ? curCost : cost;
         return connected;
     }
@@ -445,9 +478,10 @@ mod = SourceModule("""
 
         for(int i=0; i < ySize[0]; i++){
             bool connected = computeDubinsCost(cost[x[index]], cost[y[i]], &states[x[index]*3], &states[y[i]*3], radius[0], obstacles, num_obs[0]);
+            printf("after start: %i end: %i cost: %f, parent cost: %f, connected: %i\\n", y[i], x[index], cost[x[index]], cost[y[i]], connected);
 
             parent[x[index]] = connected ? y[i]: parent[x[index]];
-            cost[x[index]] = connected ? cost[y[i]] + cost[x[index]] : cost[x[index]];
+            //cost[x[index]] = connected ? cost[y[i]] + cost[x[index]] : cost[x[index]];
             open[x[index]] = connected ? 1 : open[x[index]];
             //open[y[i]] = 0;
             open[y[i]] = connected ? 0 : open[y[i]];
@@ -669,6 +703,8 @@ def unitTest1():
         [2,7,45*np.pi/180], [2,7,0*np.pi/180], [2,7,-45*np.pi/180], # 12-14
         [5,10,45*np.pi/180], [5,10,0*np.pi/180], [5,10,-45*np.pi/180]]).astype(np.float32) #15-17
 
+    states[:,1] = -states[:,1]
+
     n0 = [3,4,5,6,7,8]
     n1 = [0,1,2,9,10,11,12,13,14,15,16,17]
     n2 = [3,4,5,9,10,11]
@@ -685,7 +721,7 @@ def unitTest1():
 
     start = 1
     goal = 12
-    radius = 2
+    radius = 1
     threshold = 10
 
     init_parameters = {'states':states, 'neighbors':neighbors, 'num_neighbors':num_neighbors}
@@ -704,6 +740,8 @@ def unitTest2():
         [6,5,-45*np.pi/180], [6,5,0*np.pi/180], [6,5,45*np.pi/180], # 12-14
         [8,5,-45*np.pi/180], [8,5,0*np.pi/180], [8,5,45*np.pi/180]]).astype(np.float32) #15-17
 
+    states[:,1] = -states[:,1]
+
     n0 = [3,4,5]
     n1 = [0,1,2,6,7,8]
     n2 = [3,4,5,9,10,11]
@@ -715,12 +753,12 @@ def unitTest2():
     neighbors = np.array(nn).astype(np.int32)
     num_neighbors = np.array([len(n0),len(n0),len(n0), len(n1),len(n1),len(n1), len(n2),len(n2),len(n2), len(n3),len(n3),len(n3), len(n4),len(n4),len(n4), len(n5),len(n5),len(n5)]).astype(np.int32)
 
-    obstacles = np.array([[7,6,4,9]]).astype(np.float32)
+    obstacles = np.array([[-10,-10,-10,-10]]).astype(np.float32)
     num_obs = np.array([0]).astype(np.int32)
 
     start = 1
     goal = 16
-    radius = 2
+    radius = 1
     threshold = 2
 
     init_parameters = {'states':states, 'neighbors':neighbors, 'num_neighbors':num_neighbors}
@@ -738,6 +776,8 @@ def unitTest3():
         [-2,-4,-135*np.pi/180], [-2,-4,180*np.pi/180], [-2,-4,135*np.pi/180], # 12-14
         [4,-4,45*np.pi/180], [4,-4,0*np.pi/180], [4,-4,-45*np.pi/180]]).astype(np.float32) #15-17
 
+    states[:,1] = -states[:,1]
+
     n0 = [3,4,5]
     n1 = [0,1,2,6,7,8]
     n2 = [3,4,5,9,10,11,12,13,14]
@@ -749,12 +789,12 @@ def unitTest3():
     neighbors = np.array(nn).astype(np.int32)
     num_neighbors = np.array([len(n0),len(n0),len(n0), len(n1),len(n1),len(n1), len(n2),len(n2),len(n2), len(n3),len(n3),len(n3), len(n4),len(n4),len(n4), len(n5),len(n5),len(n5)]).astype(np.int32)
 
-    obstacles = np.array([[7,6,4,9]]).astype(np.float32)
+    obstacles = np.array([[-10,-10,-10,-10]]).astype(np.float32)
     num_obs = np.array([0]).astype(np.int32)
 
     start = 1
     goal = 16
-    radius = 2
+    radius = 1
     threshold = 2
 
     init_parameters = {'states':states, 'neighbors':neighbors, 'num_neighbors':num_neighbors}
@@ -765,7 +805,7 @@ def unitTest3():
     return route[::-1], states
 
 if __name__ == '__main__':
-    route, states = unitTest1()
+    route, states = unitTest3()
     print(route)
     print(states)
 
@@ -773,13 +813,13 @@ if __name__ == '__main__':
     y = states[:,1]
     theta = states[:,2]
     u = np.cos(theta) 
-    v = -np.sin(theta)
+    v = np.sin(theta)
 
     x_r = states[route,0] 
     y_r = states[route,1]
     theta_r = states[route,2]
     u_r = np.cos(theta_r) 
-    v_r = -np.sin(theta_r)
+    v_r = np.sin(theta_r)
 
     fig, ax = plt.subplots(nrows=2, ncols=1)
     ax[0].quiver(x,y,u,v)
