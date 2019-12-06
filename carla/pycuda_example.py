@@ -715,7 +715,7 @@ def unit2():
     num_neighbors = np.array([len(n0),len(n0),len(n0), len(n1),len(n1),len(n1), len(n2),len(n2),len(n2), len(n3),len(n3),len(n3), len(n4),len(n4),len(n4), len(n5),len(n5),len(n5)]).astype(np.int32)
 
     obstacles = np.array([[7,6,4,9]]).astype(np.float32)
-    num_obs = np.array([1]).astype(np.int32)
+    num_obs = np.array([0]).astype(np.int32)
 
     start = 1
     goal = 16
