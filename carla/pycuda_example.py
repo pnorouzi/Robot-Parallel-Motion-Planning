@@ -448,6 +448,7 @@ mod = SourceModule("""
             parent[x[index]] = connected ? y[i]: parent[x[index]];
             cost[x[index]] = connected ? cost[y[i]] + cost[x[index]] : cost[x[index]];
             open[x[index]] = connected ? 1 : open[x[index]];
+            //open[y[i]] = 0;
             open[y[i]] = connected ? 0 : open[y[i]];
             unexplored[x[index]] = connected ? 0 : unexplored[x[index]];
         }
@@ -659,7 +660,7 @@ class GMT(object):
                 print('######### iteration: ', iteration)
 
 
-if __name__ == '__main__':
+def unit1():
     states = np.array([[10,2,-135*np.pi/180], [10,2,0*np.pi/180], [10,2,45*np.pi/180], # 0-2
         [8,5,-135*np.pi/180], [8,5,90*np.pi/180], [8,5,45*np.pi/180], # 3-5
         [12,6,-135*np.pi/180], [12,6,90*np.pi/180], [12,6,45*np.pi/180], # 6-8
@@ -692,3 +693,41 @@ if __name__ == '__main__':
     gmt = GMT(init_parameters, debug=True)
     route = gmt.run_step(iter_parameters, iter_limit=8, debug=True)
     print(route)
+
+
+def unit2():
+    states = np.array([[-2,5,135*np.pi/180], [-2,5,0*np.pi/180], [-2,5,45*np.pi/180], # 0-2
+        [0,5,135*np.pi/180], [0,5,90*np.pi/180], [0,5,45*np.pi/180], # 3-5
+        [2,5,135*np.pi/180], [2,5,90*np.pi/180], [2,5,45*np.pi/180], # 6-8
+        [4,5,135*np.pi/180], [4,5,90*np.pi/180], [4,5,45*np.pi/180], # 9-11
+        [6,5,135*np.pi/180], [6,5,90*np.pi/180], [6,5,45*np.pi/180], # 12-14
+        [8,5,135*np.pi/180], [8,5,90*np.pi/180], [8,5,45*np.pi/180]]).astype(np.float32) #15-17
+
+    n0 = [3,4,5]
+    n1 = [0,1,2,6,7,8]
+    n2 = [3,4,5,9,10,11]
+    n3 = [6,7,8,12,13,14]
+    n4 = [9,10,11,15,16,17]
+    n5 = [12,13,14]
+    nn = 3*n0 + 3*n1 + 3*n2 + 3*n3 + 3*n4 + 3*n5
+
+    neighbors = np.array(nn).astype(np.int32)
+    num_neighbors = np.array([len(n0),len(n0),len(n0), len(n1),len(n1),len(n1), len(n2),len(n2),len(n2), len(n3),len(n3),len(n3), len(n4),len(n4),len(n4), len(n5),len(n5),len(n5)]).astype(np.int32)
+
+    obstacles = np.array([[7,6,4,9]]).astype(np.float32)
+    num_obs = np.array([1]).astype(np.int32)
+
+    start = 1
+    goal = 16
+    radius = 2
+    threshold = 2
+
+    init_parameters = {'states':states, 'neighbors':neighbors, 'num_neighbors':num_neighbors}
+    iter_parameters = {'start':start, 'goal':goal, 'radius':radius, 'threshold':threshold, 'obstacles':obstacles, 'num_obs':num_obs}
+
+    gmt = GMT(init_parameters, debug=True)
+    route = gmt.run_step(iter_parameters, iter_limit=20, debug=True)
+    print(route)
+
+if __name__ == '__main__':
+    unit2()

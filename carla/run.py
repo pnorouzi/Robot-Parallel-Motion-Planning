@@ -32,7 +32,7 @@ from cuda_agent import *
 from environment import *
 
 DEBUG = False
-NUM_OBSTACLES = 0
+NUM_OBSTACLES = 10
 SPAWN_POINT_INDICES = [116,198]
 AGENT = 'test'
 
@@ -59,6 +59,9 @@ def game_loop(options_dict):
         print(f'Starting from {vehicle_transform}.')
         vehicle = Car(vehicle_bp, vehicle_transform, world)
 
+        # add obstacles and get sample nodes
+        world.create_obstacles(options_dict['num_obstacles'])
+
         # select control agent
         if options_dict['agent'] == 'cuda':
             agent = CudaAgent(vehicle.vehicle)
@@ -69,7 +72,7 @@ def game_loop(options_dict):
         
         # get and set destination
         # destination_transform = spawn_points[options_dict['spawn_point_indices'][1]]
-        destination_transform = carla.Transform(carla.Location(vehicle_transform.location.x -120, vehicle_transform.location.y, vehicle_transform.location.z), carla.Rotation(yaw=vehicle_transform.rotation.yaw))
+        destination_transform = carla.Transform(carla.Location(vehicle_transform.location.x -50, vehicle_transform.location.y, vehicle_transform.location.z), carla.Rotation(yaw=vehicle_transform.rotation.yaw))
         destination_point = destination_transform.location
 
         print(f'Starting from {vehicle_transform}.')
@@ -85,8 +88,6 @@ def game_loop(options_dict):
         depth = Camera(sensor_bp[2], sensor_transform, vehicle, agent)
         segment= Camera(sensor_bp[1], sensor_transform, vehicle, agent)
 
-        # add obstacles and get sample nodes
-        # world.create_obstacles(options_dict['num_obstacles'])
 
         # run the simulation
         print('Starting the simulation.')

@@ -119,7 +119,7 @@ class TestAgent(Agent):
 
         print(f'start: {self.start} goal: {self.goal} total states: {self.states.shape[0]}')
         print(f'start location: {self.states[self.start]}, goal location: {self.states[self.goal]}')
-        print('neighbors: ', self.states[self.neighbors[-self.num_neighbors[self.start]:]])
+        # print('neighbors: ', self.states[self.neighbors[-self.num_neighbors[self.start]:]])
     
         self.gmt_planner = GMT(init_parameters, debug=True)
 
@@ -155,7 +155,6 @@ class TestAgent(Agent):
         #print('route: ', route)
         # del route[-1]
 
-        print('start planner: ', self.states[route[-1]])
         print('waypoint: ', self.states[route[::-1]])
 
         trace_route = []
@@ -216,3 +215,51 @@ class TestAgent(Agent):
             control = self._local_planner.run_step(debug)
 
         return control
+
+    @staticmethod
+    def _create_bb_points(vehicle):
+
+        cords = np.zeros((3, 4))
+        extent = vehicle.bounding_box.extent
+
+        cords[0, :] = np.array([extent.x, extent.y, extent.z, 1])
+        cords[1, :] = np.array([-extent.x, -extent.y, extent.z, 1])
+        cords[2, :] = np.array([0, 0, 0, 1])    # center
+
+        return cords
+
+    @staticmethod
+    def _vehicle_to_world(cords, vehicle):
+
+        bb_transform = carla.Transform(vehicle.bounding_box.location)
+        bb_vehicle_matrix = TestAgent.get_matrix(bb_transform)
+        vehicle_world_matrix = TestAgent.get_matrix(vehicle.get_transform())
+        bb_world_matrix = np.dot(vehicle_world_matrix, bb_vehicle_matrix)
+        world_cords = np.dot(bb_world_matrix, np.transpose(cords))
+        return world_cords
+
+    @staticmethod
+    def get_matrix(transform):
+
+        rotation = transform.rotation
+        location = transform.location
+        c_y = np.cos(np.radians(rotation.yaw))
+        s_y = np.sin(np.radians(rotation.yaw))
+        c_r = np.cos(np.radians(rotation.roll))
+        s_r = np.sin(np.radians(rotation.roll))
+        c_p = np.cos(np.radians(rotation.pitch))
+        s_p = np.sin(np.radians(rotation.pitch))
+        matrix = np.matrix(np.identity(4))
+        matrix[0, 3] = location.x
+        matrix[1, 3] = location.y
+        matrix[2, 3] = location.z
+        matrix[0, 0] = c_p * c_y
+        matrix[0, 1] = c_y * s_p * s_r - s_y * c_r
+        matrix[0, 2] = -c_y * s_p * c_r - s_y * s_r
+        matrix[1, 0] = s_y * c_p
+        matrix[1, 1] = s_y * s_p * s_r + c_y * c_r
+        matrix[1, 2] = -s_y * s_p * c_r + c_y * s_r
+        matrix[2, 0] = s_p
+        matrix[2, 1] = -c_p * s_r
+        matrix[2, 2] = c_p * c_r
+        return matrix
