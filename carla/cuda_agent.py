@@ -1,6 +1,7 @@
 import math
 import numpy as np
 import networkx as nx
+from timeit import default_timer as timer
 
 import carla
 from agents.navigation.agent import Agent, AgentState
@@ -194,7 +195,9 @@ class CudaAgent(Agent):
             self.num_obs = self.num_obs = np.array([self.obstacles.shape[0]]).astype(np.int32)
 
         iter_parameters = {'start':self.start, 'goal':self.goal, 'radius':self.radius, 'threshold':self.threshold, 'obstacles':self.obstacles, 'num_obs':self.num_obs}
+        
         route = self.gmt_planner.run_step(iter_parameters, iter_limit=10000, debug=debug)
+
         if debug:
             print('route: ', route)
         # del route[-1]
@@ -217,10 +220,17 @@ class CudaAgent(Agent):
             wp = route[-2]
             self.start = route[-2]
 
-        waypoint = self._map.get_waypoint(carla.Location(self.states[wp][0].item(), self.states[wp][2].item(), 1.2))
+        waypoint = self._map.get_waypoint(carla.Location(self.states[wp][0].item(), self.states[wp][1].item(), 1.2))
 
         control = self._vehicle_controller.run_step(self._target_speed, self.current_speed, waypoint, self.current_location) # execute first step of plan
 
-        # if debug: # draw plan
-        #     draw_waypoints(self._vehicle.get_world(), route)
+        if debug: # draw plan
+            trace_route = []
+            for r in route:
+                wp = carla.Transform(carla.Location(self.states[r][0].item(), self.states[r][1].item(), 1.2), carla.Rotation(roll=0,pitch=0, yaw=(self.states[r][2]*180/np.pi).item()))
+                trace_route.append(wp)
+            draw_waypoints(self._vehicle.get_world(), trace_route)
+
         return control
+
+        

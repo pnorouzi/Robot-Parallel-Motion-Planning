@@ -8,10 +8,7 @@ from pycuda.compiler import SourceModule
 
 import numpy as np
 import math
-
-''''
-
-'''
+from timeit import default_timer as timer
 
 mod = SourceModule("""
     #include <stdio.h>
@@ -423,13 +420,14 @@ mod = SourceModule("""
         return;
     }
 
-    __device__ bool computeDubinsCost(float &cost, float &parentCost, float *point1, float *point2, float r_min, float *obstacles, int num_obs){
+    __device__ bool computeDubinsCost(float &cost, float &parentCost, float *end_point, float *start_point, float r_min, float *obstacles, int num_obs){
         float curCost = cost;
 
-        RSRcost(&curCost, &parentCost, point1, point2, r_min, obstacles, num_obs);
-        LSLcost(&curCost, &parentCost, point1, point2, r_min, obstacles, num_obs);
-        LSRcost(&curCost, &parentCost, point1, point2, r_min, obstacles, num_obs);
-        RSLcost(&curCost, &parentCost, point1, point2, r_min, obstacles, num_obs);
+        RSRcost(&curCost, &parentCost, start_point, end_point, r_min, obstacles, num_obs);
+        LSLcost(&curCost, &parentCost, start_point, end_point, r_min, obstacles, num_obs);
+        LSRcost(&curCost, &parentCost, start_point, end_point, r_min, obstacles, num_obs);
+        RSLcost(&curCost, &parentCost, start_point, end_point, r_min, obstacles, num_obs);
+
 
         bool connected = curCost < cost;
         cost = connected ? curCost : cost;
@@ -444,10 +442,12 @@ mod = SourceModule("""
 
         for(int i=0; i < ySize[0]; i++){
             bool connected = computeDubinsCost(cost[x[index]], cost[y[i]], &states[x[index]*3], &states[y[i]*3], radius[0], obstacles, num_obs[0]);
+
             parent[x[index]] = connected ? y[i]: parent[x[index]];
             cost[x[index]] = connected ? cost[y[i]] + cost[x[index]] : cost[x[index]];
             open[x[index]] = connected ? 1 : open[x[index]];
-            open[y[i]] = connected ? 0 : open[y[i]];
+            open[y[i]] = 0;
+            //open[y[i]] = connected ? 0 : open[y[i]];
             unexplored[x[index]] = connected ? 0 : unexplored[x[index]];
         }
     }
@@ -572,7 +572,9 @@ class GMT(object):
         # del self.route[-1]
 
     def run_step(self, iter_parameters, iter_limit=1000, debug=False):
+        start = timer()
         self.step_init(iter_parameters,debug)
+        end = timer()
 
         goal_reached = False
         iteration = 0
@@ -611,12 +613,12 @@ class GMT(object):
                 # del self.route[-1]
                 return self.route
             elif goal_reached:
-                print('### goal reached ###')
+                print('### goal reached ### ', iteration)
                 self.parent = self.dev_parent.get()
                 self.get_path()
                 return self.route
             elif gSize == 0:
-                print('### threshold skip')
+                print('### threshold skip ', iteration)
                 continue
 
             dev_G = cuda.zeros(gSize, dtype=np.int32)
@@ -656,4 +658,7 @@ class GMT(object):
                 print('G size: ', gSize, 'G: ', dev_G)
 
                 print('x size: ', dev_xSize, 'x: ', dev_x)
-                print('######### iteration: ', iteration)
+            print('######### iteration: ', iteration)
+
+        
+        print('Time elapsed: ', end - start)
