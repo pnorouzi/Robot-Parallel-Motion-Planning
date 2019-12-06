@@ -7,6 +7,7 @@ from pycuda.compiler import SourceModule
 
 import numpy as np
 import math
+import matplotlib.pyplot as plt
 
 ''''
 
@@ -660,13 +661,13 @@ class GMT(object):
                 print('######### iteration: ', iteration)
 
 
-def unit1():
-    states = np.array([[10,2,-135*np.pi/180], [10,2,0*np.pi/180], [10,2,45*np.pi/180], # 0-2
-        [8,5,-135*np.pi/180], [8,5,90*np.pi/180], [8,5,45*np.pi/180], # 3-5
-        [12,6,-135*np.pi/180], [12,6,90*np.pi/180], [12,6,45*np.pi/180], # 6-8
-        [11,8,-135*np.pi/180], [11,8,90*np.pi/180], [11,8,45*np.pi/180], # 9-11
-        [2,7,-135*np.pi/180], [2,7,90*np.pi/180], [2,7,45*np.pi/180], # 12-14
-        [5,10,-135*np.pi/180], [5,10,90*np.pi/180], [5,10,45*np.pi/180]]).astype(np.float32) #15-17
+def unitTest1():
+    states = np.array([[10,2,135*np.pi/180], [10,2,90*np.pi/180], [10,2,45*np.pi/180], # 0-2
+        [8,5,135*np.pi/180], [8,5,90*np.pi/180], [8,5,45*np.pi/180], # 3-5
+        [12,6,135*np.pi/180], [12,6,90*np.pi/180], [12,6,45*np.pi/180], # 6-8
+        [11,8,135*np.pi/180], [11,8,90*np.pi/180], [11,8,45*np.pi/180], # 9-11
+        [2,7,135*np.pi/180], [2,7,90*np.pi/180], [2,7,45*np.pi/180], # 12-14
+        [5,10,135*np.pi/180], [5,10,90*np.pi/180], [5,10,45*np.pi/180]]).astype(np.float32) #15-17
 
     n0 = [3,4,5,6,7,8]
     n1 = [0,1,2,9,10,11,12,13,14,15,16,17]
@@ -692,16 +693,16 @@ def unit1():
 
     gmt = GMT(init_parameters, debug=True)
     route = gmt.run_step(iter_parameters, iter_limit=8, debug=True)
-    print(route)
+    return route[::-1], states
 
 
-def unit2():
+def unitTest2():
     states = np.array([[-2,5,-45*np.pi/180], [-2,5,0*np.pi/180], [-2,5,45*np.pi/180], # 0-2
         [0,5,-45*np.pi/180], [0,5,0*np.pi/180], [0,5,45*np.pi/180], # 3-5
         [2,5,-45*np.pi/180], [2,5,0*np.pi/180], [2,5,45*np.pi/180], # 6-8
         [4,5,-45*np.pi/180], [4,5,0*np.pi/180], [4,5,45*np.pi/180], # 9-11
         [6,5,-45*np.pi/180], [6,5,0*np.pi/180], [6,5,45*np.pi/180], # 12-14
-        [8,5,135*np.pi/180], [8,5,0*np.pi/180], [8,5,45*np.pi/180]]).astype(np.float32) #15-17
+        [8,5,-45*np.pi/180], [8,5,0*np.pi/180], [8,5,45*np.pi/180]]).astype(np.float32) #15-17
 
     n0 = [3,4,5]
     n1 = [0,1,2,6,7,8]
@@ -727,9 +728,9 @@ def unit2():
 
     gmt = GMT(init_parameters, debug=True)
     route = gmt.run_step(iter_parameters, iter_limit=20, debug=True)
-    print(route)
+    return route[::-1], states
 
-def unit3():
+def unitTest3():
     states = np.array([[0,0,135*np.pi/180], [0,0,90*np.pi/180], [0,0,45*np.pi/180], # 0-2
         [0,-2,135*np.pi/180], [0,-2,90*np.pi/180], [0,-2,45*np.pi/180], # 3-5
         [0,-4,135*np.pi/180], [0,-4,90*np.pi/180], [0,-4,45*np.pi/180], # 6-8
@@ -761,7 +762,36 @@ def unit3():
 
     gmt = GMT(init_parameters, debug=True)
     route = gmt.run_step(iter_parameters, iter_limit=20, debug=True)
-    print(route)
+    return route[::-1], states
 
 if __name__ == '__main__':
-    unit3()
+    route, states = unitTest2()
+    print(route)
+    print(states)
+
+    x = states[:,0]
+    y = -states[:,1]
+    theta = states[:,2]
+    u = np.cos(theta) 
+    v = np.sin(theta)
+
+    x_r = states[route,0] 
+    y_r = -states[route,1]
+    theta_r = states[route,2]
+    u_r = np.cos(theta_r) 
+    v_r = np.sin(theta_r)
+
+    fig, ax = plt.subplots(nrows=2, ncols=1)
+    ax[0].quiver(x,y,u,v)
+    ax[0].set_title('States')
+    ax[1].quiver(x_r,y_r,u_r,v_r)
+    ax[1].set_title('Route')
+
+    for a in ax.flat:
+        a.set(xlabel='x', ylabel='y')
+
+    # Hide x labels and tick labels for top plots and y ticks for right plots.
+    for a in ax.flat:
+        a.label_outer()
+
+    plt.show()
