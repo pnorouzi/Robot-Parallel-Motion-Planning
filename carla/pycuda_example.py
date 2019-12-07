@@ -8,6 +8,7 @@ from pycuda.compiler import SourceModule
 import numpy as np
 import math
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 
 ''''
 
@@ -679,14 +680,15 @@ class GMT(object):
 
 
 def unitTest1():
-    states = np.array([[10,2,45*np.pi/180], [10,2,0*np.pi/180], [10,2,-45*np.pi/180], # 0-2
+    states0 = np.array([[10,2,45*np.pi/180], [10,2,0*np.pi/180], [10,2,-45*np.pi/180], # 0-2
         [8,5,45*np.pi/180], [8,5,0*np.pi/180], [8,5,-45*np.pi/180], # 3-5
         [12,6,45*np.pi/180], [12,6,0*np.pi/180], [12,6,-45*np.pi/180], # 6-8
         [11,8,45*np.pi/180], [11,8,0*np.pi/180], [11,8,-45*np.pi/180], # 9-11
         [2,7,45*np.pi/180], [2,7,0*np.pi/180], [2,7,-45*np.pi/180], # 12-14
         [5,10,45*np.pi/180], [5,10,0*np.pi/180], [5,10,-45*np.pi/180]]).astype(np.float32) #15-17
 
-    # states[:,1] = -states[:,1]
+    states = np.array([states0[:,1], states0[:,0], states0[:,2]]).T
+        # states[:,1] = -states[:,1]
 
     n0 = [3,4,5,6,7,8]
     n1 = [0,1,2,9,10,11,12,13,14,15,16,17]
@@ -703,7 +705,7 @@ def unitTest1():
     num_obs = np.array([1]).astype(np.int32)
 
     start = 1
-    goal = 12
+    goal = 17
     radius = 1
     threshold = 10
 
@@ -712,7 +714,7 @@ def unitTest1():
 
     gmt = GMT(init_parameters, debug=True)
     route = gmt.run_step(iter_parameters, iter_limit=8, debug=True)
-    return route[::-1], states
+    return route[::-1], states, obstacles
 
 
 def unitTest2():
@@ -723,7 +725,7 @@ def unitTest2():
         [6,5,-45*np.pi/180], [6,5,0*np.pi/180], [6,5,45*np.pi/180], # 12-14
         [8,5,-45*np.pi/180], [8,5,0*np.pi/180], [8,5,45*np.pi/180]]).astype(np.float32) #15-17
 
-    # states[:,1] = -states[:,1]
+    # states[:,1] = -states[:,1], obstacles
 
     n0 = [3,4,5]
     n1 = [0,1,2,6,7,8]
@@ -740,7 +742,7 @@ def unitTest2():
     num_obs = np.array([0]).astype(np.int32)
 
     start = 1
-    goal = 15
+    goal = 16
     radius = 1
     threshold = 2
 
@@ -749,7 +751,7 @@ def unitTest2():
 
     gmt = GMT(init_parameters, debug=True)
     route = gmt.run_step(iter_parameters, iter_limit=20, debug=True)
-    return route[::-1], states
+    return route[::-1], states, obstacles
 
 def unitTest3():
     states = np.array([[0,0,135*np.pi/180], [0,0,90*np.pi/180], [0,0,45*np.pi/180], # 0-2
@@ -759,7 +761,7 @@ def unitTest3():
         [-2,-4,-135*np.pi/180], [-2,-4,180*np.pi/180], [-2,-4,135*np.pi/180], # 12-14
         [4,-4,45*np.pi/180], [4,-4,0*np.pi/180], [4,-4,-45*np.pi/180]]).astype(np.float32) #15-17
 
-    # states[:,1] = -states[:,1]
+    states[:,1] = -states[:,1]
 
     n0 = [3,4,5]
     n1 = [0,1,2,6,7,8]
@@ -785,36 +787,53 @@ def unitTest3():
 
     gmt = GMT(init_parameters, debug=True)
     route = gmt.run_step(iter_parameters, iter_limit=20, debug=True)
-    return route[::-1], states
+    return route[::-1], states, obstacles
 
 if __name__ == '__main__':
-    route, states = unitTest2()
+    route, states, obstacles = unitTest1()
     print(route)
     print(states[route,:])
+
+    left = -2
+    right = 6
+    up = 6
+    down = -2
 
     x = states[:,0]
     y = states[:,1]
     theta = states[:,2]
     u = np.cos(theta) 
-    v = -np.sin(theta)
+    v = np.sin(theta)
 
     x_r = states[route,0] 
     y_r = states[route,1]
     theta_r = states[route,2]
     u_r = np.cos(theta_r) 
-    v_r = -np.sin(theta_r)
+    v_r = np.sin(theta_r)
 
     fig, ax = plt.subplots(nrows=2, ncols=1)
     ax[0].quiver(x,y,u,v)
     ax[0].set_title('States')
+    # ax[0].set_xlim(left, right)
+    # ax[0].set_ylim(up, down)
     ax[1].quiver(x_r,y_r,u_r,v_r)
     ax[1].set_title('Route')
+    # ax[1].set_xlim(left, right)
+    # ax[1].set_ylim(up, down)
+    # Create a Rectangle patch
+    # rect = patches.Rectangle((6,4),3,3,linewidth=1,edgecolor='r',facecolor='none')
+    # rect2 = patches.Rectangle((6,4),3,3,linewidth=1,edgecolor='r',facecolor='none')
+
+    # # Add the patch to the Axes
+    # ax[0].add_patch(rect)
+    # ax[1].add_patch(rect2)
 
     for a in ax.flat:
         a.set(xlabel='x', ylabel='y')
 
-    # Hide x labels and tick labels for top plots and y ticks for right plots.
-    for a in ax.flat:
-        a.label_outer()
+
+    # # Hide x labels and tick labels for top plots and y ticks for right plots.
+    # for a in ax.flat:
+    #     a.label_outer()
 
     plt.show()
