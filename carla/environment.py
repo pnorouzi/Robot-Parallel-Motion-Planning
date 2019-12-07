@@ -87,7 +87,7 @@ class World(object):
 
     def swerve_obstacles(self):
         transform = self.map.get_spawn_points()[116]
-        transform.location.x -= 25
+        transform.location.x -= 20
         transform.location.y += 1
         transform.rotation.yaw -= 90 # get random yaw orientation so vehicles don't line up
 
@@ -107,14 +107,14 @@ class World(object):
         if npc is not None:
             self.actor_list.append(npc)
 
-        transform.location.x -= 13
-        transform.location.y -= 10
-        transform.rotation.yaw -= 180
+        # transform.location.x -= 13
+        # transform.location.y -= 10
+        # transform.rotation.yaw -= 180
 
-        npc = self.world.try_spawn_actor(bp, transform)
+        # npc = self.world.try_spawn_actor(bp, transform)
 
-        if npc is not None:
-            self.actor_list.append(npc)
+        # if npc is not None:
+        #     self.actor_list.append(npc)
 
     def random_obstacles(self, num_obstacles):
         print(f'Creating {num_obstacles} obstacles.')

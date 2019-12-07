@@ -46,7 +46,7 @@ def game_loop(options_dict):
         client.set_timeout(30.0)
 
         print('Changing world to Town 5.')
-        client.load_world('Town05') 
+        # client.load_world('Town05') 
 
         # create world object
         world = World(client.get_world())

@@ -671,4 +671,4 @@ class GMT(object):
                 print('G size: ', gSize, 'G: ', dev_G)
 
                 print('x size: ', dev_xSize, 'x: ', dev_x)
-                print('######### iteration: ', iteration)
+            print('######### iteration: ', iteration)

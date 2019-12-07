@@ -136,7 +136,7 @@ class TestAgent(Agent):
     
         self.gmt_planner = GMT(init_parameters, debug=True)
 
-   @staticmethod
+    @staticmethod
     def _create_bb_points(vehicle):
 
         cords = np.zeros((3, 4))
@@ -278,7 +278,8 @@ class TestAgent(Agent):
             hazard_detected = True
 
         # check for the state of the traffic lights
-        light_state, traffic_light = False, None # self._is_light_red(lights_list)
+        light_state, traffic_light = False, None # 
+        # light_state, traffic_light = self._is_light_red(lights_list)
         if light_state:
             if debug:
                 print('=== RED LIGHT AHEAD [{}])'.format(traffic_light.id))
