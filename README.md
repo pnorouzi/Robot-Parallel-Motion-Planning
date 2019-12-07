@@ -36,7 +36,7 @@ Dubin's Model | Example
 
 # GMT* Sampling Based Motion Planning
 
-
+![](images/gmtExample.gif)
 
 # Debugging
 
