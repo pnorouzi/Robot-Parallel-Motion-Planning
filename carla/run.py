@@ -32,7 +32,7 @@ from cuda_agent import *
 from environment import *
 
 DEBUG = False
-NUM_OBSTACLES = 40
+NUM_OBSTACLES = 1
 SPAWN_POINT_INDICES = [116,198]
 AGENT = 'test'
 
@@ -55,12 +55,14 @@ def game_loop(options_dict):
         # spawn vehicle
         vehicle_bp = 'model3'
         vehicle_transform = spawn_points[options_dict['spawn_point_indices'][0]]
-        vehicle_transform.location.x -= 4
+        vehicle_transform.location.x -= 6
         print(f'Starting from {vehicle_transform}.')
         vehicle = Car(vehicle_bp, vehicle_transform, world)
 
         # # add obstacles and get sample nodes
-        world.create_obstacles(options_dict['num_obstacles'])
+        # world.block_road()
+        world.swerve_obstacles()
+        # world.random_obstacles(options_dict['num_obstacles'])
 
         world_snapshot = None
         while not world_snapshot:

@@ -58,6 +58,19 @@ class TestAgent(Agent):
         self._world = self._vehicle.get_world()
         self._map = self._vehicle.get_world().get_map()
 
+    def set_destination(self, start_waypoint, end_waypoint):
+        """
+        This method creates a list of waypoints from agent's position to destination location
+        based on the route returned by the global router
+        """
+
+        self.create_samples(start_waypoint, end_waypoint)
+
+        route_trace = self._trace_route()
+        assert route_trace
+
+        self._local_planner.set_global_plan(route_trace)
+
     def create_samples(self, start, goal, waypoint_dist = 4, disk_radius = 4*math.sqrt(2), num_yaw = 8):
         print(f'Creating samples {waypoint_dist}m apart with {num_yaw} yaw vaules and neighbors within {disk_radius}m.')
 
@@ -123,18 +136,53 @@ class TestAgent(Agent):
     
         self.gmt_planner = GMT(init_parameters, debug=True)
 
-    def set_destination(self, start_waypoint, end_waypoint):
-        """
-        This method creates a list of waypoints from agent's position to destination location
-        based on the route returned by the global router
-        """
+   @staticmethod
+    def _create_bb_points(vehicle):
 
-        self.create_samples(start_waypoint, end_waypoint)
+        cords = np.zeros((3, 4))
+        extent = vehicle.bounding_box.extent
 
-        route_trace = self._trace_route()
-        assert route_trace
+        cords[0, :] = np.array([extent.x + 2.2, extent.y + 2.2, extent.z, 1])
+        cords[1, :] = np.array([-extent.x - 2.2, -extent.y - 2.2, extent.z, 1])
+        cords[2, :] = np.array([0, 0, 0, 1])    # center
 
-        self._local_planner.set_global_plan(route_trace)
+        return cords
+
+    @staticmethod
+    def _vehicle_to_world(cords, vehicle):
+
+        bb_transform = carla.Transform(vehicle.bounding_box.location)
+        bb_vehicle_matrix = TestAgent.get_matrix(bb_transform)
+        vehicle_world_matrix = TestAgent.get_matrix(vehicle.get_transform())
+        bb_world_matrix = np.dot(vehicle_world_matrix, bb_vehicle_matrix)
+        world_cords = np.dot(bb_world_matrix, np.transpose(cords))
+        return world_cords
+
+    @staticmethod
+    def get_matrix(transform):
+
+        rotation = transform.rotation
+        location = transform.location
+        c_y = np.cos(np.radians(rotation.yaw))
+        s_y = np.sin(np.radians(rotation.yaw))
+        c_r = np.cos(np.radians(rotation.roll))
+        s_r = np.sin(np.radians(rotation.roll))
+        c_p = np.cos(np.radians(rotation.pitch))
+        s_p = np.sin(np.radians(rotation.pitch))
+        matrix = np.matrix(np.identity(4))
+        matrix[0, 3] = location.x
+        matrix[1, 3] = location.y
+        matrix[2, 3] = location.z
+        matrix[0, 0] = c_p * c_y
+        matrix[0, 1] = c_y * s_p * s_r - s_y * c_r
+        matrix[0, 2] = -c_y * s_p * c_r - s_y * s_r
+        matrix[1, 0] = s_y * c_p
+        matrix[1, 1] = s_y * s_p * s_r + c_y * c_r
+        matrix[1, 2] = -s_y * s_p * c_r + c_y * s_r
+        matrix[2, 0] = s_p
+        matrix[2, 1] = -c_p * s_r
+        matrix[2, 2] = c_p * c_r
+        return matrix
 
     def _trace_route(self, debug=False):
         """
@@ -148,7 +196,6 @@ class TestAgent(Agent):
         # self.num_obs = self.num_obs = np.array([0]).astype(np.int32)
 
         obstacles = []
-        print('length of  obstacle list', len(self._world.get_actors().filter('vehicle.*')))
         for vehicle in self._world.get_actors().filter('vehicle.*'):
                 #print(vehicle.bounding_box)
                 # draw Box
@@ -231,7 +278,7 @@ class TestAgent(Agent):
             hazard_detected = True
 
         # check for the state of the traffic lights
-        light_state, traffic_light = False, None #self._is_light_red(lights_list)
+        light_state, traffic_light = False, None # self._is_light_red(lights_list)
         if light_state:
             if debug:
                 print('=== RED LIGHT AHEAD [{}])'.format(traffic_light.id))
@@ -247,51 +294,3 @@ class TestAgent(Agent):
             control = self._local_planner.run_step(debug)
 
         return control
-
-    @staticmethod
-    def _create_bb_points(vehicle):
-
-        cords = np.zeros((3, 4))
-        extent = vehicle.bounding_box.extent
-
-        cords[0, :] = np.array([extent.x + 2, extent.y + 2, extent.z, 1])
-        cords[1, :] = np.array([-extent.x - 2, -extent.y - 2, extent.z, 1])
-        cords[2, :] = np.array([0, 0, 0, 1])    # center
-
-        return cords
-
-    @staticmethod
-    def _vehicle_to_world(cords, vehicle):
-
-        bb_transform = carla.Transform(vehicle.bounding_box.location)
-        bb_vehicle_matrix = TestAgent.get_matrix(bb_transform)
-        vehicle_world_matrix = TestAgent.get_matrix(vehicle.get_transform())
-        bb_world_matrix = np.dot(vehicle_world_matrix, bb_vehicle_matrix)
-        world_cords = np.dot(bb_world_matrix, np.transpose(cords))
-        return world_cords
-
-    @staticmethod
-    def get_matrix(transform):
-
-        rotation = transform.rotation
-        location = transform.location
-        c_y = np.cos(np.radians(rotation.yaw))
-        s_y = np.sin(np.radians(rotation.yaw))
-        c_r = np.cos(np.radians(rotation.roll))
-        s_r = np.sin(np.radians(rotation.roll))
-        c_p = np.cos(np.radians(rotation.pitch))
-        s_p = np.sin(np.radians(rotation.pitch))
-        matrix = np.matrix(np.identity(4))
-        matrix[0, 3] = location.x
-        matrix[1, 3] = location.y
-        matrix[2, 3] = location.z
-        matrix[0, 0] = c_p * c_y
-        matrix[0, 1] = c_y * s_p * s_r - s_y * c_r
-        matrix[0, 2] = -c_y * s_p * c_r - s_y * s_r
-        matrix[1, 0] = s_y * c_p
-        matrix[1, 1] = s_y * s_p * s_r + c_y * c_r
-        matrix[1, 2] = -s_y * s_p * c_r + c_y * s_r
-        matrix[2, 0] = s_p
-        matrix[2, 1] = -c_p * s_r
-        matrix[2, 2] = c_p * c_r
-        return matrix

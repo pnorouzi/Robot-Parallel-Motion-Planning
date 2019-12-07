@@ -50,20 +50,79 @@ class World(object):
         self.actor_list = []
         self.sensor_buffer = {}
 
-        print('Enabling synchronous mode.')
-        settings = self.world.get_settings()
-        settings.fixed_delta_seconds = 0.05
-        settings.synchronous_mode = True
-        self.world.apply_settings(settings)
+        # print('Enabling synchronous mode.')
+        # settings = self.world.get_settings()
+        # settings.fixed_delta_seconds = 0.05
+        # settings.synchronous_mode = True
+        # self.world.apply_settings(settings)
 
-    def create_obstacles(self, num_obstacles):
+    def block_road(self):
+        transform = self.map.get_spawn_points()[116]
+        transform.location.x -= 30
+        transform.location.y += 1
+        transform.rotation.yaw += 75 # get random yaw orientation so vehicles don't line up
+
+        bp = self.blueprint_library.filter('police')[0]
+
+        npc = self.world.try_spawn_actor(bp, transform)
+
+        if npc is not None:
+            self.actor_list.append(npc)
+
+        transform.location.x -= 3
+        transform.location.y += 5
+
+        npc = self.world.try_spawn_actor(bp, transform)
+
+        if npc is not None:
+            self.actor_list.append(npc)
+
+        transform.location.x -= 3
+        transform.location.y += 5
+
+        npc = self.world.try_spawn_actor(bp, transform)
+
+        if npc is not None:
+            self.actor_list.append(npc)
+
+    def swerve_obstacles(self):
+        transform = self.map.get_spawn_points()[116]
+        transform.location.x -= 25
+        transform.location.y += 1
+        transform.rotation.yaw -= 90 # get random yaw orientation so vehicles don't line up
+
+        bp = self.blueprint_library.filter('carlacola')[0]
+
+        npc = self.world.try_spawn_actor(bp, transform)
+
+        if npc is not None:
+            self.actor_list.append(npc)
+
+        transform.location.x -= 13
+        transform.location.y += 9
+        transform.rotation.yaw += 180
+
+        npc = self.world.try_spawn_actor(bp, transform)
+
+        if npc is not None:
+            self.actor_list.append(npc)
+
+        transform.location.x -= 13
+        transform.location.y -= 10
+        transform.rotation.yaw -= 180
+
+        npc = self.world.try_spawn_actor(bp, transform)
+
+        if npc is not None:
+            self.actor_list.append(npc)
+
+    def random_obstacles(self, num_obstacles):
         print(f'Creating {num_obstacles} obstacles.')
         obstacles = 0
         # continue randomly spawning obstacles until desired number reached
         while obstacles < num_obstacles:
             transform = random.choice(self.world.get_map().get_spawn_points())
-            # transform = self.map.get_spawn_points()[116]
-            # transform.location.x -= 35
+
             transform.rotation.yaw = random.randrange(-180.0, 180.0, 1.0) # get random yaw orientation so vehicles don't line up
 
             bp = random.choice(self.blueprint_library.filter('vehicle')) # random vehicle for fun

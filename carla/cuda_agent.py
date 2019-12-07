@@ -45,7 +45,7 @@ class CudaAgent(Agent):
         self.start_waypoint = self._map.get_waypoint(self._vehicle.get_location())
         self.end_waypoint = self._map.get_waypoint(carla.Location(location[0], location[1], location[2]))
 
-    def create_samples(self, start, goal, waypoint_dist = 5, disk_radius = 5*math.sqrt(2), num_yaw = 8):
+    def create_samples(self, start, goal, waypoint_dist = 4, disk_radius = 4*math.sqrt(2), num_yaw = 8):
         print(f'Creating samples {waypoint_dist}m apart with {num_yaw} yaw vaules and neighbors within {disk_radius}m.')
 
         wp = []
@@ -101,8 +101,8 @@ class CudaAgent(Agent):
         self.num_neighbors = np.array(num_neighbors).astype(np.int32)
 
         init_parameters = {'states':self.states, 'neighbors':self.neighbors, 'num_neighbors':self.num_neighbors}
-        self.start = self.states.shape[0] - 7
-        self.goal = self.states.shape[0] - 14
+        self.start = self.states.shape[0] -1*(num_yaw-1)
+        self.goal = self.states.shape[0] - 2*(num_yaw-1)
 
         print(f'start: {self.start} goal: {self.goal}')
     
@@ -114,8 +114,8 @@ class CudaAgent(Agent):
         cords = np.zeros((3, 4))
         extent = vehicle.bounding_box.extent
 
-        cords[0, :] = np.array([extent.x, extent.y, extent.z, 1])
-        cords[1, :] = np.array([-extent.x, -extent.y, extent.z, 1])
+        cords[0, :] = np.array([extent.x + 2.2, extent.y + 2.2, extent.z, 1])
+        cords[1, :] = np.array([-extent.x - 2.2, -extent.y - 2.2, extent.z, 1])
         cords[2, :] = np.array([0, 0, 0, 1])    # center
 
         return cords
@@ -229,7 +229,7 @@ class CudaAgent(Agent):
             for r in route:
                 wp = carla.Transform(carla.Location(self.states[r][0].item(), self.states[r][1].item(), 1.2), carla.Rotation(roll=0,pitch=0, yaw=(self.states[r][2]*180/np.pi).item()))
                 trace_route.append(wp)
-            draw_waypoints(self._vehicle.get_world(), trace_route)
+            draw_route(self._vehicle.get_world(), trace_route)
 
         return control
 
