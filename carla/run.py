@@ -32,7 +32,7 @@ from cuda_agent import *
 from environment import *
 
 DEBUG = False
-NUM_OBSTACLES = 1
+NUM_OBSTACLES = 0
 SPAWN_POINT_INDICES = [116,198]
 AGENT = 'test'
 
@@ -46,7 +46,7 @@ def game_loop(options_dict):
         client.set_timeout(30.0)
 
         print('Changing world to Town 5.')
-        # client.load_world('Town05') 
+        client.load_world('Town05') 
 
         # create world object
         world = World(client.get_world())
@@ -61,8 +61,8 @@ def game_loop(options_dict):
 
         # # add obstacles and get sample nodes
         # world.block_road()
-        world.swerve_obstacles()
-        # world.random_obstacles(options_dict['num_obstacles'])
+        # world.swerve_obstacles()
+        world.random_obstacles(options_dict['num_obstacles'])
 
         world_snapshot = None
         while not world_snapshot:

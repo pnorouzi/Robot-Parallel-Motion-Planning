@@ -104,6 +104,8 @@ class TestAgent(Agent):
                             ni.append(j*(num_yaw-1) + k-1)
                         else:
                             ni.append(j*(num_yaw-1) + k)
+                        # if wj == start or wj == goal:
+                        #     break
                         num += 1
 
             # add in number of yaw orientations to waypoint list        
@@ -121,6 +123,8 @@ class TestAgent(Agent):
                 elif theta <= -180:
                     theta = 360 - theta
                 states.append([li.x, li.y, theta*np.pi/180])
+                # if wi == start or wi == goal:
+                #     break
 
         self.states = np.array(states).astype(np.float32)
         self.neighbors = np.array(neighbors).astype(np.int32)
@@ -129,12 +133,15 @@ class TestAgent(Agent):
         init_parameters = {'states':self.states, 'neighbors':self.neighbors, 'num_neighbors':self.num_neighbors}
         self.start = self.states.shape[0] -1*(num_yaw-1)
         self.goal = self.states.shape[0] - 2*(num_yaw-1)
+        # self.start = self.states.shape[0] - 1
+        # self.goal = self.states.shape[0] - 2
 
         print(f'start: {self.start} goal: {self.goal} total states: {self.states.shape[0]}')
         print(f'start location: {self.states[self.start]}, goal location: {self.states[self.goal]}')
         # print('neighbors: ', self.states[self.neighbors[-self.num_neighbors[self.start]:]])
     
-        self.gmt_planner = GMT(init_parameters, debug=True)
+        # self.gmt_planner = GMT(init_parameters, debug=True)
+        self.gmt_planner = GMTasync(init_parameters, debug=True)
 
     @staticmethod
     def _create_bb_points(vehicle):
@@ -228,7 +235,11 @@ class TestAgent(Agent):
 
         iter_parameters = {'start':self.start, 'goal':self.goal, 'radius':self.radius, 'threshold':self.threshold, 'obstacles':self.obstacles, 'num_obs':self.num_obs}
         
+        start = timer()
         route = self.gmt_planner.run_step(iter_parameters, iter_limit=1000, debug=debug)
+        end = timer()
+
+        print("elapsed time: ", end-start)    
 
         # if debug:
         #print('route: ', route)

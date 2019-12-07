@@ -213,11 +213,11 @@ class CudaAgent(Agent):
         self.radius = 2
         self.threshold  = 2
 
-        route = self._trace_route(debug) # get plan
+        self.route = self._trace_route(debug) # get plan
         if len(route) == 0:
             wp = self.start
         else:
-            wp = route[-2]
+            wp = self.route[-2]
             self.start = route[-2]
 
         waypoint = self._map.get_waypoint(carla.Location(self.states[wp][0].item(), self.states[wp][1].item(), 1.2))
@@ -226,11 +226,28 @@ class CudaAgent(Agent):
 
         if debug: # draw plan
             trace_route = []
-            for r in route:
+            for r in self.route:
                 wp = carla.Transform(carla.Location(self.states[r][0].item(), self.states[r][1].item(), 1.2), carla.Rotation(roll=0,pitch=0, yaw=(self.states[r][2]*180/np.pi).item()))
                 trace_route.append(wp)
             draw_route(self._vehicle.get_world(), trace_route)
 
         return control
+
+    def update_start(self):
+        self.current_location = self._vehicle.get_transform()
+        route_location = self.route[-1:-3]
+        
+        current_state = np.array([self.current_location.location.x, self.current_location.location.y , self.current_location.rotation.yaw])
+        route_state = self.states[route_location, 0:2]
+
+        dist = np.linalg.norm(current_state[0:2]-route_state, axis=1)
+        new_neighbors = np.argmin(dist)
+
+        self.states[self.start, : ] = current_state
+        del self.neighbors[-self.num_neighbors[self.start]:]  
+        # self.neighbors += 
+        self.num_neighbors[self.start] = self.num_neighbors[route_location[new_neighbors]]
+
+
 
         
