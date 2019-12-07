@@ -8,15 +8,13 @@ from pycuda.compiler import SourceModule
 
 import numpy as np
 import math
-
-''''
-
-'''
+from timeit import default_timer as timer
 
 mod = SourceModule("""
     #include <stdio.h>
+    #define ZERO 1e-6
 
-    __device__ bool check_col(float *y_vals,float *x_vals,float *obstacles, int num_obs){
+    __device__ bool check_col(float *y_vals, float *x_vals, float *obstacles, int num_obs){
         if (num_obs==0){
             return false;
         }
@@ -36,14 +34,15 @@ mod = SourceModule("""
         return false;
     }
 
-    __device__ void RSRcost(float *curCost, float *parentCost, float *point1,float *point2, int r_min, float *obstacles, int num_obs){
+
+    __device__ void RSRcost(float *curCost, float *start_point, float *end_point, int r_min, float *obstacles, int num_obs){
         float PI = 3.141592653589793;
 
-        float p_c1 [2] = { point1[0] + (r_min * cosf(point1[2] - PI/2)), point1[1] + (r_min * sinf(point1[2] - PI/2))}; 
-        float p_c2 [2] = { point2[0] + (r_min * cosf(point2[2] - PI/2)), point2[1] + (r_min * sinf(point2[2] - PI/2))};
+        float p_c1 [2] = { start_point[0] + (r_min * cosf(start_point[2] - PI/2)), start_point[1] + (r_min * sinf(start_point[2] - PI/2))}; 
+        float p_c2 [2] = { end_point[0] + (r_min * cosf(end_point[2] - PI/2)), end_point[1] + (r_min * sinf(end_point[2] - PI/2))};
 
-        float r_1 = sqrtf(powf(p_c1[0]-point1[0],2.0) + powf(p_c1[1]-point1[1],2.0));
-        float r_2 = sqrtf(powf(p_c2[0]-point2[0],2.0) + powf(p_c2[1]-point2[1],2.0));
+        float r_1 = sqrtf(powf(p_c1[0]-start_point[0],2.0) + powf(p_c1[1]-start_point[1],2.0));
+        float r_2 = sqrtf(powf(p_c2[0]-end_point[0],2.0) + powf(p_c2[1]-end_point[1],2.0));
 
         float V1 [2] = {p_c2[0]-p_c1[0],p_c2[1]-p_c1[1]};
 
@@ -64,17 +63,18 @@ mod = SourceModule("""
 
         float V2 [2] = {tangent_2[0]-tangent_1[0],tangent_2[1]-tangent_1[1]};
 
-        float p2_h [2] = {point1[0], point1[1]};
+
+        float p2_h [2] = {start_point[0], start_point[1]};
         float v1 [2] = {p2_h[0]-p_c1[0], p2_h[1]-p_c1[1]};
         float v2 [2] = {tangent_1[0]-p_c1[0], tangent_1[1]-p_c1[1]};
 
         float theta_1 = atan2f(v2[1],v2[0]) - atan2f(v1[1],v1[0]);
 
-        if (theta_1>0){
+        if (theta_1>ZERO){
             theta_1-=(PI*2);
         }
 
-        float angle = point1[2] + (PI/2);
+        float angle = start_point[2] + (PI/2);
 
         float x_vals [150] = { };
         float y_vals [150] = { };
@@ -85,7 +85,8 @@ mod = SourceModule("""
             y_vals[i] = (abs(r_1) * sinf(angle+(i*d_theta))) + p_c1[1];
         }
 
-        float p3_h [2] = {point2[0], point2[1]};
+
+        float p3_h [2] = {end_point[0], end_point[1]};
         v1[0] = tangent_2[0]-p_c2[0];
         v1[1] = tangent_2[1]-p_c2[1];
 
@@ -95,8 +96,8 @@ mod = SourceModule("""
         float theta_2 = atan2f(v2[1],v2[0]) - atan2f(v1[1],v1[0]);
 
 
-        if (theta_2>0){
-            theta_2-=(PI*2);
+        if (theta_2>ZERO){
+        theta_2-=(PI*2);
         }
 
         angle = atan2f((tangent_2[1]-p_c2[1]),(tangent_2[0]-p_c2[0]));
@@ -117,15 +118,15 @@ mod = SourceModule("""
         }
 
         // checks for collision
-
         bool collision = check_col(y_vals,x_vals,obstacles,num_obs);
 
+
         if (collision){
-            return;
+        return;
         }
 
+
         float cost = abs((r_1*theta_1)) + abs((r_2*theta_2)) + sqrtf(powf(V2[0],2) + powf(V2[1],2));
-        cost += *parentCost;
 
         if (cost> *curCost){
             return;
@@ -135,14 +136,15 @@ mod = SourceModule("""
         return;
     }
 
-    __device__ void LSLcost(float *curCost, float *parentCost, float *point1,float *point2, int r_min, float *obstacles, int num_obs){
+
+    __device__ void LSLcost(float *curCost, float *start_point, float *end_point, int r_min, float *obstacles, int num_obs){
         float PI = 3.141592653589793;
 
-        float p_c1 [2] = { point1[0] + (r_min * cosf(point1[2] + PI/2)), point1[1] + (r_min * sinf(point1[2] + PI/2))}; 
-        float p_c2 [2] = { point2[0] + (r_min * cosf(point2[2] + PI/2)), point2[1] + (r_min * sinf(point2[2] + PI/2))};
+        float p_c1 [2] = { start_point[0] + (r_min * cosf(start_point[2] + PI/2)), start_point[1] + (r_min * sinf(start_point[2] + PI/2))}; 
+        float p_c2 [2] = { end_point[0] + (r_min * cosf(end_point[2] + PI/2)), end_point[1] + (r_min * sinf(end_point[2] + PI/2))};
 
-        float r_1 = -1.0 * sqrtf(powf(p_c1[0]-point1[0],2.0) + powf(p_c1[1]-point1[1],2.0));
-        float r_2 = -1.0 * sqrtf(powf(p_c2[0]-point2[0],2.0) + powf(p_c2[1]-point2[1],2.0));
+        float r_1 = -1.0 * sqrtf(powf(p_c1[0]-start_point[0],2.0) + powf(p_c1[1]-start_point[1],2.0));
+        float r_2 = -1.0 * sqrtf(powf(p_c2[0]-end_point[0],2.0) + powf(p_c2[1]-end_point[1],2.0));
 
         float V1 [2] = {p_c2[0]-p_c1[0],p_c2[1]-p_c1[1]};
 
@@ -163,17 +165,18 @@ mod = SourceModule("""
 
         float V2 [2] = {tangent_2[0]-tangent_1[0],tangent_2[1]-tangent_1[1]};
 
-        float p2_h [2] = {point1[0], point1[1]};
+
+        float p2_h [2] = {start_point[0], start_point[1]};
         float v1 [2] = {p2_h[0]-p_c1[0], p2_h[1]-p_c1[1]};
         float v2 [2] = {tangent_1[0]-p_c1[0], tangent_1[1]-p_c1[1]};
 
         float theta_1 = atan2f(v2[1],v2[0]) - atan2f(v1[1],v1[0]);
 
-        if (theta_1<0){
+        if (theta_1<-ZERO){
             theta_1+=(PI*2);
         }
 
-        float angle = point1[2] - (PI/2);
+        float angle = start_point[2] - (PI/2);
 
         float x_vals [150] = { };
         float y_vals [150] = { };
@@ -184,7 +187,7 @@ mod = SourceModule("""
             y_vals[i] = (abs(r_1) * sinf(angle+(i*d_theta))) + p_c1[1];
         }
 
-        float p3_h [2] = {point2[0], point2[1]};
+        float p3_h [2] = {end_point[0], end_point[1]};
         v1[0] = tangent_2[0]-p_c2[0];
         v1[1] = tangent_2[1]-p_c2[1];
 
@@ -193,7 +196,8 @@ mod = SourceModule("""
 
         float theta_2 = atan2f(v2[1],v2[0]) - atan2f(v1[1],v1[0]);
 
-        if (theta_2<0){
+
+        if (theta_2<-ZERO){
             theta_2+=(PI*2);
         }
         angle = atan2f((tangent_2[1]-p_c2[1]),(tangent_2[0]-p_c2[0]));
@@ -213,14 +217,15 @@ mod = SourceModule("""
             y_vals[i+50] = y_vals[49] + (i*d_y);
         }
 
+
         bool collision = check_col(y_vals,x_vals,obstacles,num_obs);
 
         if (collision){
             return;
         }
 
+
         float cost = abs((r_1*theta_1)) + abs((r_2*theta_2)) + sqrtf(powf(V2[0],2) + powf(V2[1],2));
-        cost += *parentCost;
 
         if (cost> *curCost){
             return;
@@ -230,14 +235,15 @@ mod = SourceModule("""
         return;
     }
 
-    __device__ void LSRcost(float *curCost, float *parentCost, float *point1,float *point2, int r_min, float *obstacles, int num_obs){
+
+    __device__ void LSRcost(float *curCost, float *start_point, float *end_point, int r_min, float *obstacles, int num_obs){
         float PI = 3.141592653589793;
 
-        float p_c1 [2] = { point1[0] + (r_min * cosf(point1[2] + PI/2)), point1[1] + (r_min * sinf(point1[2] + PI/2))}; 
-        float p_c2 [2] = { point2[0] + (r_min * cosf(point2[2] - PI/2)), point2[1] + (r_min * sinf(point2[2] - PI/2))};
+        float p_c1 [2] = { start_point[0] + (r_min * cosf(start_point[2] + PI/2)), start_point[1] + (r_min * sinf(start_point[2] + PI/2))}; 
+        float p_c2 [2] = { end_point[0] + (r_min * cosf(end_point[2] - PI/2)), end_point[1] + (r_min * sinf(end_point[2] - PI/2))};
 
-        float r_1 = -1.0 * sqrtf(powf(p_c1[0]-point1[0],2.0) + powf(p_c1[1]-point1[1],2.0));
-        float r_2 = sqrtf(powf(p_c2[0]-point2[0],2.0) + powf(p_c2[1]-point2[1],2.0));
+        float r_1 = -1.0 * sqrtf(powf(p_c1[0]-start_point[0],2.0) + powf(p_c1[1]-start_point[1],2.0));
+        float r_2 = sqrtf(powf(p_c2[0]-end_point[0],2.0) + powf(p_c2[1]-end_point[1],2.0));
 
         float V1 [2] = {p_c2[0]-p_c1[0],p_c2[1]-p_c1[1]};
 
@@ -258,17 +264,18 @@ mod = SourceModule("""
 
         float V2 [2] = {tangent_2[0]-tangent_1[0],tangent_2[1]-tangent_1[1]};
 
-        float p2_h [2] = {point1[0], point1[1]};
+
+        float p2_h [2] = {start_point[0], start_point[1]};
         float v1 [2] = {p2_h[0]-p_c1[0], p2_h[1]-p_c1[1]};
         float v2 [2] = {tangent_1[0]-p_c1[0], tangent_1[1]-p_c1[1]};
 
         float theta_1 = atan2f(v2[1],v2[0]) - atan2f(v1[1],v1[0]);
 
-        if (theta_1<0){
+        if (theta_1<-ZERO){
             theta_1+=(PI*2);
         }
 
-        float angle = point1[2] - (PI/2);
+        float angle = start_point[2] - (PI/2);
 
         float x_vals [150] = { };
         float y_vals [150] = { };
@@ -280,7 +287,7 @@ mod = SourceModule("""
         }
 
 
-        float p3_h [2] = {point2[0], point2[1]};
+        float p3_h [2] = {end_point[0], end_point[1]};
         v1[0] = tangent_2[0]-p_c2[0];
         v1[1] = tangent_2[1]-p_c2[1];
 
@@ -289,7 +296,7 @@ mod = SourceModule("""
 
         float theta_2 = atan2f(v2[1],v2[0]) - atan2f(v1[1],v1[0]);
 
-        if (theta_2>0){
+        if (theta_2>ZERO){
             theta_2-=(PI*2);
         }
 
@@ -317,7 +324,6 @@ mod = SourceModule("""
         }
 
         float cost = abs((r_1*theta_1)) + abs((r_2*theta_2)) + sqrtf(powf(V2[0],2) + powf(V2[1],2));
-        cost += *parentCost;
 
         if (cost> *curCost){
             return;
@@ -327,14 +333,15 @@ mod = SourceModule("""
         return;
     }
 
-    __device__ void RSLcost(float *curCost, float *parentCost, float *point1, float *point2, int r_min, float *obstacles, int num_obs){
+
+    __device__ void RSLcost(float *curCost, float *start_point, float *end_point, int r_min, float *obstacles, int num_obs){
         float PI = 3.141592653589793;
 
-        float p_c1 [2] = { point1[0] + (r_min * cosf(point1[2] - PI/2)), point1[1] + (r_min * sinf(point1[2] - PI/2))}; 
-        float p_c2 [2] = { point2[0] + (r_min * cosf(point2[2] + PI/2)), point2[1] + (r_min * sinf(point2[2] + PI/2))};
+        float p_c1 [2] = { start_point[0] + (r_min * cosf(start_point[2] - PI/2)), start_point[1] + (r_min * sinf(start_point[2] - PI/2))}; 
+        float p_c2 [2] = { end_point[0] + (r_min * cosf(end_point[2] + PI/2)), end_point[1] + (r_min * sinf(end_point[2] + PI/2))};
 
-        float r_1 = sqrtf(powf(p_c1[0]-point1[0],2.0) + powf(p_c1[1]-point1[1],2.0));
-        float r_2 = -1.0 * sqrtf(powf(p_c2[0]-point2[0],2.0) + powf(p_c2[1]-point2[1],2.0));
+        float r_1 = sqrtf(powf(p_c1[0]-start_point[0],2.0) + powf(p_c1[1]-start_point[1],2.0));
+        float r_2 = -1.0 * sqrtf(powf(p_c2[0]-end_point[0],2.0) + powf(p_c2[1]-end_point[1],2.0));
 
         float V1 [2] = {p_c2[0]-p_c1[0],p_c2[1]-p_c1[1]};
 
@@ -355,17 +362,17 @@ mod = SourceModule("""
 
         float V2 [2] = {tangent_2[0]-tangent_1[0],tangent_2[1]-tangent_1[1]};
 
-        float p2_h [2] = {point1[0], point1[1]};
+        float p2_h [2] = {start_point[0], start_point[1]};
         float v1 [2] = {p2_h[0]-p_c1[0], p2_h[1]-p_c1[1]};
         float v2 [2] = {tangent_1[0]-p_c1[0], tangent_1[1]-p_c1[1]};
 
         float theta_1 = atan2f(v2[1],v2[0]) - atan2f(v1[1],v1[0]);
 
-        if (theta_1>0){
+        if (theta_1>ZERO){
             theta_1-=(PI*2);
         }
 
-        float angle = point1[2] + (PI/2);
+        float angle = start_point[2] + (PI/2);
 
         float x_vals [150] = { };
         float y_vals [150] = { };
@@ -376,7 +383,8 @@ mod = SourceModule("""
             y_vals[i] = (abs(r_1) * sinf(angle+(i*d_theta))) + p_c1[1];
         }
 
-        float p3_h [2] = {point2[0], point2[1]};
+
+        float p3_h [2] = {end_point[0], end_point[1]};
         v1[0] = tangent_2[0]-p_c2[0];
         v1[1] = tangent_2[1]-p_c2[1];
 
@@ -385,7 +393,7 @@ mod = SourceModule("""
 
         float theta_2 = atan2f(v2[1],v2[0]) - atan2f(v1[1],v1[0]);
 
-        if (theta_2<0){
+        if (theta_2<-ZERO){
             theta_2+=(PI*2);
         }
 
@@ -413,7 +421,6 @@ mod = SourceModule("""
         }
 
         float cost = abs((r_1*theta_1)) + abs((r_2*theta_2)) + sqrtf(powf(V2[0],2) + powf(V2[1],2));
-        cost += *parentCost;
 
         if (cost > *curCost){
             return;
@@ -423,18 +430,22 @@ mod = SourceModule("""
         return;
     }
 
-    __device__ bool computeDubinsCost(float &cost, float &parentCost, float *point1, float *point2, float r_min, float *obstacles, int num_obs){
-        float curCost = cost;
 
-        RSRcost(&curCost, &parentCost, point1, point2, r_min, obstacles, num_obs);
-        LSLcost(&curCost, &parentCost, point1, point2, r_min, obstacles, num_obs);
-        LSRcost(&curCost, &parentCost, point1, point2, r_min, obstacles, num_obs);
-        RSLcost(&curCost, &parentCost, point1, point2, r_min, obstacles, num_obs);
+    __device__ bool computeDubinsCost(float &cost, float &parentCost, float *end_point, float *start_point, float r_min, float *obstacles, int num_obs){
+        float curCost = 9999999999.9;
 
+        RSRcost(&curCost, start_point, end_point, r_min, obstacles, num_obs);
+        LSLcost(&curCost, start_point, end_point, r_min, obstacles, num_obs);
+        LSRcost(&curCost, start_point, end_point, r_min, obstacles, num_obs);
+        RSLcost(&curCost, start_point, end_point, r_min, obstacles, num_obs);
+
+        curCost += parentCost;
         bool connected = curCost < cost;
+
         cost = connected ? curCost : cost;
         return connected;
     }
+
 
     __global__ void dubinConnection(float *cost, int *parent, int *x, int *y, float *states, int *open, int *unexplored, const int *xSize, const int *ySize, float *obstacles, int *num_obs, float *radius){
         const int index = threadIdx.x + (blockIdx.x * blockDim.x);
@@ -444,13 +455,15 @@ mod = SourceModule("""
 
         for(int i=0; i < ySize[0]; i++){
             bool connected = computeDubinsCost(cost[x[index]], cost[y[i]], &states[x[index]*3], &states[y[i]*3], radius[0], obstacles, num_obs[0]);
+
             parent[x[index]] = connected ? y[i]: parent[x[index]];
-            cost[x[index]] = connected ? cost[y[i]] + cost[x[index]] : cost[x[index]];
             open[x[index]] = connected ? 1 : open[x[index]];
-            open[y[i]] = connected ? 0 : open[y[i]];
+            open[y[i]] = 0;
+            //open[y[i]] = connected ? 0 : open[y[i]];
             unexplored[x[index]] = connected ? 0 : unexplored[x[index]];
         }
     }
+
 
     __global__ void wavefront(int *G, int *open, float *cost, float *threshold, const int *n){
         const int index = threadIdx.x + (blockIdx.x * blockDim.x);
@@ -460,6 +473,7 @@ mod = SourceModule("""
         
         G[index] = open[index] && cost[index] <= threshold[0] ? 1 : 0;
     }
+
 
     __global__ void neighborIndicator(int *x_indicator, int *G, int *unexplored, int *neighbors, int *num_neighbors, int *neighbors_index, const int *n){
         const int index = threadIdx.x + (blockIdx.x * blockDim.x);
@@ -472,6 +486,7 @@ mod = SourceModule("""
             x_indicator[j] = unexplored[j] || x_indicator[j] > 0 ? 1 : 0;
         }      
     }
+
 
     __global__ void compact(int *x, int *scan, int *indicator, int *waypoints, const int *n){
         const int index = threadIdx.x + (blockIdx.x * blockDim.x);
@@ -513,6 +528,7 @@ class GMT(object):
         
         if debug:
             print('neighbors: ', self.neighbors)
+            print('number neighbors: ', self.num_neighbors)
 
     def _gpu_init(self, debug):
         self.dev_states = cuda.to_gpu(self.states)
@@ -602,20 +618,20 @@ class GMT(object):
             compact(dev_y, dev_yscan, self.dev_open, self.dev_waypoints, self.dev_n, block=(threadsPerBlock,1,1), grid=(nBlocksPerGrid,1))
 
             if ySize == 0:
-                print('### empty open set ###')
+                print('### empty open set ###', iteration)
                 # del self.route[-1]
                 return self.route
             elif iteration >= iter_limit:
-                print('### iteration limit ###')
+                print('### iteration limit ###', iteration)
                 # del self.route[-1]
                 return self.route
             elif goal_reached:
-                print('### goal reached ###')
+                print('### goal reached ### ', iteration)
                 self.parent = self.dev_parent.get()
                 self.get_path()
                 return self.route
             elif gSize == 0:
-                print('### threshold skip')
+                print('### threshold skip ', iteration)
                 continue
 
             dev_G = cuda.zeros(gSize, dtype=np.int32)
@@ -655,4 +671,4 @@ class GMT(object):
                 print('G size: ', gSize, 'G: ', dev_G)
 
                 print('x size: ', dev_xSize, 'x: ', dev_x)
-                print('######### iteration: ', iteration)
+            print('######### iteration: ', iteration)

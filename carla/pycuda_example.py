@@ -7,6 +7,7 @@ from pycuda.compiler import SourceModule
 
 import numpy as np
 import math
+import matplotlib.pyplot as plt
 
 ''''
 
@@ -14,8 +15,9 @@ import math
 
 mod = SourceModule("""
     #include <stdio.h>
+    #define ZERO 1e-10
 
-    __device__ bool check_col(float *y_vals,float *x_vals,float *obstacles, int num_obs){
+    __device__ bool check_col(float *y_vals, float *x_vals, float *obstacles, int num_obs){
         if (num_obs==0){
             return false;
         }
@@ -27,7 +29,6 @@ mod = SourceModule("""
                 float max_x = fmax(obstacles[obs*4],obstacles[obs*4 +2]);
                 if (max_y>=y_vals[i] && min_y<=y_vals[i]) {
                     if (max_x>=x_vals[i] && min_x<=x_vals[i]){
-                        printf("obstacle here \\n");
                         return true;
                     }
                 }
@@ -36,14 +37,15 @@ mod = SourceModule("""
         return false;
     }
 
-    __device__ void RSRcost(float *curCost, float *parentCost, float *point1,float *point2, int r_min, float *obstacles, int num_obs){
+
+    __device__ void RSRcost(float *curCost, float *start_point, float *end_point, int r_min, float *obstacles, int num_obs){
         float PI = 3.141592653589793;
 
-        float p_c1 [2] = { point1[0] + (r_min * cosf(point1[2] - PI/2)), point1[1] + (r_min * sinf(point1[2] - PI/2))}; 
-        float p_c2 [2] = { point2[0] + (r_min * cosf(point2[2] - PI/2)), point2[1] + (r_min * sinf(point2[2] - PI/2))};
+        float p_c1 [2] = { start_point[0] + (r_min * cosf(start_point[2] - PI/2)), start_point[1] + (r_min * sinf(start_point[2] - PI/2))}; 
+        float p_c2 [2] = { end_point[0] + (r_min * cosf(end_point[2] - PI/2)), end_point[1] + (r_min * sinf(end_point[2] - PI/2))};
 
-        float r_1 = sqrtf(powf(p_c1[0]-point1[0],2.0) + powf(p_c1[1]-point1[1],2.0));
-        float r_2 = sqrtf(powf(p_c2[0]-point2[0],2.0) + powf(p_c2[1]-point2[1],2.0));
+        float r_1 = sqrtf(powf(p_c1[0]-start_point[0],2.0) + powf(p_c1[1]-start_point[1],2.0));
+        float r_2 = sqrtf(powf(p_c2[0]-end_point[0],2.0) + powf(p_c2[1]-end_point[1],2.0));
 
         float V1 [2] = {p_c2[0]-p_c1[0],p_c2[1]-p_c1[1]};
 
@@ -64,17 +66,18 @@ mod = SourceModule("""
 
         float V2 [2] = {tangent_2[0]-tangent_1[0],tangent_2[1]-tangent_1[1]};
 
-        float p2_h [2] = {point1[0], point1[1]};
+
+        float p2_h [2] = {start_point[0], start_point[1]};
         float v1 [2] = {p2_h[0]-p_c1[0], p2_h[1]-p_c1[1]};
         float v2 [2] = {tangent_1[0]-p_c1[0], tangent_1[1]-p_c1[1]};
 
         float theta_1 = atan2f(v2[1],v2[0]) - atan2f(v1[1],v1[0]);
 
-        if (theta_1>0){
+        if (theta_1>ZERO){
             theta_1-=(PI*2);
         }
 
-        float angle = point1[2] + (PI/2);
+        float angle = start_point[2] + (PI/2);
 
         float x_vals [150] = { };
         float y_vals [150] = { };
@@ -85,7 +88,8 @@ mod = SourceModule("""
             y_vals[i] = (abs(r_1) * sinf(angle+(i*d_theta))) + p_c1[1];
         }
 
-        float p3_h [2] = {point2[0], point2[1]};
+
+        float p3_h [2] = {end_point[0], end_point[1]};
         v1[0] = tangent_2[0]-p_c2[0];
         v1[1] = tangent_2[1]-p_c2[1];
 
@@ -95,8 +99,8 @@ mod = SourceModule("""
         float theta_2 = atan2f(v2[1],v2[0]) - atan2f(v1[1],v1[0]);
 
 
-        if (theta_2>0){
-            theta_2-=(PI*2);
+        if (theta_2>ZERO){
+        theta_2-=(PI*2);
         }
 
         angle = atan2f((tangent_2[1]-p_c2[1]),(tangent_2[0]-p_c2[0]));
@@ -117,15 +121,15 @@ mod = SourceModule("""
         }
 
         // checks for collision
-
         bool collision = check_col(y_vals,x_vals,obstacles,num_obs);
 
+
         if (collision){
-            return;
+        return;
         }
 
+
         float cost = abs((r_1*theta_1)) + abs((r_2*theta_2)) + sqrtf(powf(V2[0],2) + powf(V2[1],2));
-        cost += *parentCost;
 
         if (cost> *curCost){
             return;
@@ -135,14 +139,15 @@ mod = SourceModule("""
         return;
     }
 
-    __device__ void LSLcost(float *curCost, float *parentCost, float *point1,float *point2, int r_min, float *obstacles, int num_obs){
+
+    __device__ void LSLcost(float *curCost, float *start_point, float *end_point, int r_min, float *obstacles, int num_obs){
         float PI = 3.141592653589793;
 
-        float p_c1 [2] = { point1[0] + (r_min * cosf(point1[2] + PI/2)), point1[1] + (r_min * sinf(point1[2] + PI/2))}; 
-        float p_c2 [2] = { point2[0] + (r_min * cosf(point2[2] + PI/2)), point2[1] + (r_min * sinf(point2[2] + PI/2))};
+        float p_c1 [2] = { start_point[0] + (r_min * cosf(start_point[2] + PI/2)), start_point[1] + (r_min * sinf(start_point[2] + PI/2))}; 
+        float p_c2 [2] = { end_point[0] + (r_min * cosf(end_point[2] + PI/2)), end_point[1] + (r_min * sinf(end_point[2] + PI/2))};
 
-        float r_1 = -1.0 * sqrtf(powf(p_c1[0]-point1[0],2.0) + powf(p_c1[1]-point1[1],2.0));
-        float r_2 = -1.0 * sqrtf(powf(p_c2[0]-point2[0],2.0) + powf(p_c2[1]-point2[1],2.0));
+        float r_1 = -1.0 * sqrtf(powf(p_c1[0]-start_point[0],2.0) + powf(p_c1[1]-start_point[1],2.0));
+        float r_2 = -1.0 * sqrtf(powf(p_c2[0]-end_point[0],2.0) + powf(p_c2[1]-end_point[1],2.0));
 
         float V1 [2] = {p_c2[0]-p_c1[0],p_c2[1]-p_c1[1]};
 
@@ -163,17 +168,18 @@ mod = SourceModule("""
 
         float V2 [2] = {tangent_2[0]-tangent_1[0],tangent_2[1]-tangent_1[1]};
 
-        float p2_h [2] = {point1[0], point1[1]};
+
+        float p2_h [2] = {start_point[0], start_point[1]};
         float v1 [2] = {p2_h[0]-p_c1[0], p2_h[1]-p_c1[1]};
         float v2 [2] = {tangent_1[0]-p_c1[0], tangent_1[1]-p_c1[1]};
 
         float theta_1 = atan2f(v2[1],v2[0]) - atan2f(v1[1],v1[0]);
 
-        if (theta_1<0){
+        if (theta_1<-ZERO){
             theta_1+=(PI*2);
         }
 
-        float angle = point1[2] - (PI/2);
+        float angle = start_point[2] - (PI/2);
 
         float x_vals [150] = { };
         float y_vals [150] = { };
@@ -184,7 +190,7 @@ mod = SourceModule("""
             y_vals[i] = (abs(r_1) * sinf(angle+(i*d_theta))) + p_c1[1];
         }
 
-        float p3_h [2] = {point2[0], point2[1]};
+        float p3_h [2] = {end_point[0], end_point[1]};
         v1[0] = tangent_2[0]-p_c2[0];
         v1[1] = tangent_2[1]-p_c2[1];
 
@@ -193,7 +199,8 @@ mod = SourceModule("""
 
         float theta_2 = atan2f(v2[1],v2[0]) - atan2f(v1[1],v1[0]);
 
-        if (theta_2<0){
+
+        if (theta_2<-ZERO){
             theta_2+=(PI*2);
         }
         angle = atan2f((tangent_2[1]-p_c2[1]),(tangent_2[0]-p_c2[0]));
@@ -213,14 +220,15 @@ mod = SourceModule("""
             y_vals[i+50] = y_vals[49] + (i*d_y);
         }
 
+
         bool collision = check_col(y_vals,x_vals,obstacles,num_obs);
 
         if (collision){
             return;
         }
 
+
         float cost = abs((r_1*theta_1)) + abs((r_2*theta_2)) + sqrtf(powf(V2[0],2) + powf(V2[1],2));
-        cost += *parentCost;
 
         if (cost> *curCost){
             return;
@@ -230,14 +238,15 @@ mod = SourceModule("""
         return;
     }
 
-    __device__ void LSRcost(float *curCost, float *parentCost, float *point1,float *point2, int r_min, float *obstacles, int num_obs){
+
+    __device__ void LSRcost(float *curCost, float *start_point, float *end_point, int r_min, float *obstacles, int num_obs){
         float PI = 3.141592653589793;
 
-        float p_c1 [2] = { point1[0] + (r_min * cosf(point1[2] + PI/2)), point1[1] + (r_min * sinf(point1[2] + PI/2))}; 
-        float p_c2 [2] = { point2[0] + (r_min * cosf(point2[2] - PI/2)), point2[1] + (r_min * sinf(point2[2] - PI/2))};
+        float p_c1 [2] = { start_point[0] + (r_min * cosf(start_point[2] + PI/2)), start_point[1] + (r_min * sinf(start_point[2] + PI/2))}; 
+        float p_c2 [2] = { end_point[0] + (r_min * cosf(end_point[2] - PI/2)), end_point[1] + (r_min * sinf(end_point[2] - PI/2))};
 
-        float r_1 = -1.0 * sqrtf(powf(p_c1[0]-point1[0],2.0) + powf(p_c1[1]-point1[1],2.0));
-        float r_2 = sqrtf(powf(p_c2[0]-point2[0],2.0) + powf(p_c2[1]-point2[1],2.0));
+        float r_1 = -1.0 * sqrtf(powf(p_c1[0]-start_point[0],2.0) + powf(p_c1[1]-start_point[1],2.0));
+        float r_2 = sqrtf(powf(p_c2[0]-end_point[0],2.0) + powf(p_c2[1]-end_point[1],2.0));
 
         float V1 [2] = {p_c2[0]-p_c1[0],p_c2[1]-p_c1[1]};
 
@@ -258,17 +267,18 @@ mod = SourceModule("""
 
         float V2 [2] = {tangent_2[0]-tangent_1[0],tangent_2[1]-tangent_1[1]};
 
-        float p2_h [2] = {point1[0], point1[1]};
+
+        float p2_h [2] = {start_point[0], start_point[1]};
         float v1 [2] = {p2_h[0]-p_c1[0], p2_h[1]-p_c1[1]};
         float v2 [2] = {tangent_1[0]-p_c1[0], tangent_1[1]-p_c1[1]};
 
         float theta_1 = atan2f(v2[1],v2[0]) - atan2f(v1[1],v1[0]);
 
-        if (theta_1<0){
+        if (theta_1<-ZERO){
             theta_1+=(PI*2);
         }
 
-        float angle = point1[2] - (PI/2);
+        float angle = start_point[2] - (PI/2);
 
         float x_vals [150] = { };
         float y_vals [150] = { };
@@ -280,7 +290,7 @@ mod = SourceModule("""
         }
 
 
-        float p3_h [2] = {point2[0], point2[1]};
+        float p3_h [2] = {end_point[0], end_point[1]};
         v1[0] = tangent_2[0]-p_c2[0];
         v1[1] = tangent_2[1]-p_c2[1];
 
@@ -289,7 +299,7 @@ mod = SourceModule("""
 
         float theta_2 = atan2f(v2[1],v2[0]) - atan2f(v1[1],v1[0]);
 
-        if (theta_2>0){
+        if (theta_2>ZERO){
             theta_2-=(PI*2);
         }
 
@@ -317,7 +327,6 @@ mod = SourceModule("""
         }
 
         float cost = abs((r_1*theta_1)) + abs((r_2*theta_2)) + sqrtf(powf(V2[0],2) + powf(V2[1],2));
-        cost += *parentCost;
 
         if (cost> *curCost){
             return;
@@ -327,14 +336,15 @@ mod = SourceModule("""
         return;
     }
 
-    __device__ void RSLcost(float *curCost, float *parentCost, float *point1, float *point2, int r_min, float *obstacles, int num_obs){
+
+    __device__ void RSLcost(float *curCost, float *start_point, float *end_point, int r_min, float *obstacles, int num_obs){
         float PI = 3.141592653589793;
 
-        float p_c1 [2] = { point1[0] + (r_min * cosf(point1[2] - PI/2)), point1[1] + (r_min * sinf(point1[2] - PI/2))}; 
-        float p_c2 [2] = { point2[0] + (r_min * cosf(point2[2] + PI/2)), point2[1] + (r_min * sinf(point2[2] + PI/2))};
+        float p_c1 [2] = { start_point[0] + (r_min * cosf(start_point[2] - PI/2)), start_point[1] + (r_min * sinf(start_point[2] - PI/2))}; 
+        float p_c2 [2] = { end_point[0] + (r_min * cosf(end_point[2] + PI/2)), end_point[1] + (r_min * sinf(end_point[2] + PI/2))};
 
-        float r_1 = sqrtf(powf(p_c1[0]-point1[0],2.0) + powf(p_c1[1]-point1[1],2.0));
-        float r_2 = -1.0 * sqrtf(powf(p_c2[0]-point2[0],2.0) + powf(p_c2[1]-point2[1],2.0));
+        float r_1 = sqrtf(powf(p_c1[0]-start_point[0],2.0) + powf(p_c1[1]-start_point[1],2.0));
+        float r_2 = -1.0 * sqrtf(powf(p_c2[0]-end_point[0],2.0) + powf(p_c2[1]-end_point[1],2.0));
 
         float V1 [2] = {p_c2[0]-p_c1[0],p_c2[1]-p_c1[1]};
 
@@ -355,17 +365,17 @@ mod = SourceModule("""
 
         float V2 [2] = {tangent_2[0]-tangent_1[0],tangent_2[1]-tangent_1[1]};
 
-        float p2_h [2] = {point1[0], point1[1]};
+        float p2_h [2] = {start_point[0], start_point[1]};
         float v1 [2] = {p2_h[0]-p_c1[0], p2_h[1]-p_c1[1]};
         float v2 [2] = {tangent_1[0]-p_c1[0], tangent_1[1]-p_c1[1]};
 
         float theta_1 = atan2f(v2[1],v2[0]) - atan2f(v1[1],v1[0]);
 
-        if (theta_1>0){
+        if (theta_1>ZERO){
             theta_1-=(PI*2);
         }
 
-        float angle = point1[2] + (PI/2);
+        float angle = start_point[2] + (PI/2);
 
         float x_vals [150] = { };
         float y_vals [150] = { };
@@ -376,7 +386,8 @@ mod = SourceModule("""
             y_vals[i] = (abs(r_1) * sinf(angle+(i*d_theta))) + p_c1[1];
         }
 
-        float p3_h [2] = {point2[0], point2[1]};
+
+        float p3_h [2] = {end_point[0], end_point[1]};
         v1[0] = tangent_2[0]-p_c2[0];
         v1[1] = tangent_2[1]-p_c2[1];
 
@@ -385,7 +396,7 @@ mod = SourceModule("""
 
         float theta_2 = atan2f(v2[1],v2[0]) - atan2f(v1[1],v1[0]);
 
-        if (theta_2<0){
+        if (theta_2<-ZERO){
             theta_2+=(PI*2);
         }
 
@@ -413,7 +424,6 @@ mod = SourceModule("""
         }
 
         float cost = abs((r_1*theta_1)) + abs((r_2*theta_2)) + sqrtf(powf(V2[0],2) + powf(V2[1],2));
-        cost += *parentCost;
 
         if (cost > *curCost){
             return;
@@ -423,18 +433,22 @@ mod = SourceModule("""
         return;
     }
 
-    __device__ bool computeDubinsCost(float &cost, float &parentCost, float *point1, float *point2, float r_min, float *obstacles, int num_obs){
-        float curCost = cost;
 
-        RSRcost(&curCost, &parentCost, point1, point2, r_min, obstacles, num_obs);
-        LSLcost(&curCost, &parentCost, point1, point2, r_min, obstacles, num_obs);
-        LSRcost(&curCost, &parentCost, point1, point2, r_min, obstacles, num_obs);
-        RSLcost(&curCost, &parentCost, point1, point2, r_min, obstacles, num_obs);
+    __device__ bool computeDubinsCost(float &cost, float &parentCost, float *end_point, float *start_point, float r_min, float *obstacles, int num_obs){
+        float curCost = 9999999999.9;
 
+        RSRcost(&curCost, start_point, end_point, r_min, obstacles, num_obs);
+        LSLcost(&curCost, start_point, end_point, r_min, obstacles, num_obs);
+        LSRcost(&curCost, start_point, end_point, r_min, obstacles, num_obs);
+        RSLcost(&curCost, start_point, end_point, r_min, obstacles, num_obs);
+
+        curCost += parentCost;
         bool connected = curCost < cost;
+
         cost = connected ? curCost : cost;
         return connected;
     }
+
 
     __global__ void dubinConnection(float *cost, int *parent, int *x, int *y, float *states, int *open, int *unexplored, const int *xSize, const int *ySize, float *obstacles, int *num_obs, float *radius){
         const int index = threadIdx.x + (blockIdx.x * blockDim.x);
@@ -442,28 +456,27 @@ mod = SourceModule("""
             return;
         }
 
-        //printf("dubin %i, %i\\n", index, xSize[0]);
-
         for(int i=0; i < ySize[0]; i++){
             bool connected = computeDubinsCost(cost[x[index]], cost[y[i]], &states[x[index]*3], &states[y[i]*3], radius[0], obstacles, num_obs[0]);
+
             parent[x[index]] = connected ? y[i]: parent[x[index]];
-            cost[x[index]] = connected ? cost[y[i]] + cost[x[index]] : cost[x[index]];
             open[x[index]] = connected ? 1 : open[x[index]];
-            open[y[i]] = connected ? 0 : open[y[i]];
+            open[y[i]] = 0;
+            //open[y[i]] = connected ? 0 : open[y[i]];
             unexplored[x[index]] = connected ? 0 : unexplored[x[index]];
         }
     }
+
 
     __global__ void wavefront(int *G, int *open, float *cost, float *threshold, const int *n){
         const int index = threadIdx.x + (blockIdx.x * blockDim.x);
         if(index >= n[0]){
             return;
         }
-
-        //printf("wavefront %i, %i\\n", index, n[0]);
         
         G[index] = open[index] && cost[index] <= threshold[0] ? 1 : 0;
     }
+
 
     __global__ void neighborIndicator(int *x_indicator, int *G, int *unexplored, int *neighbors, int *num_neighbors, int *neighbors_index, const int *n){
         const int index = threadIdx.x + (blockIdx.x * blockDim.x);
@@ -473,10 +486,10 @@ mod = SourceModule("""
 
         for(int i=0; i < num_neighbors[G[index]]; i++){
             int j = neighbors[neighbors_index[G[index]] + i];
-            //printf("indicator %i, %i\\n", j, G[index]);
             x_indicator[j] = unexplored[j] || x_indicator[j] > 0 ? 1 : 0;
         }      
     }
+
 
     __global__ void compact(int *x, int *scan, int *indicator, int *waypoints, const int *n){
         const int index = threadIdx.x + (blockIdx.x * blockDim.x);
@@ -484,7 +497,6 @@ mod = SourceModule("""
             return;
         }
 
-        //printf("compact index %i, indicator %i, scan %i, waypoint %i\\n", index, indicator[index], scan[index], waypoints[index]);
         if(indicator[index] == 1){
             x[scan[index]] = waypoints[index];
         }
@@ -507,6 +519,7 @@ class GMT(object):
 
     def _cpu_init(self, init_parameters, debug):
         self.states = init_parameters['states']
+        # self.states[:,1] *= -1
         self.n = self.states.shape[0]
         self.waypoints = np.arange(self.n).astype(np.int32)
 
@@ -519,6 +532,7 @@ class GMT(object):
         
         if debug:
             print('neighbors: ', self.neighbors)
+            print('number neighbors: ', self.num_neighbors)
 
     def _gpu_init(self, debug):
         self.dev_states = cuda.to_gpu(self.states)
@@ -616,12 +630,12 @@ class GMT(object):
                 # del self.route[-1]
                 return self.route
             elif goal_reached:
-                print('### goal reached ###')
+                print('### goal reached ### ', iteration)
                 self.parent = self.dev_parent.get()
                 self.get_path()
                 return self.route
             elif gSize == 0:
-                print('### threshold skip')
+                print('### threshold skip ', iteration)
                 continue
 
             dev_G = cuda.zeros(gSize, dtype=np.int32)
@@ -661,16 +675,18 @@ class GMT(object):
                 print('G size: ', gSize, 'G: ', dev_G)
 
                 print('x size: ', dev_xSize, 'x: ', dev_x)
-                print('######### iteration: ', iteration)
+            print('######### iteration: ', iteration)
 
 
-if __name__ == '__main__':
-    states = np.array([[10,2,135*np.pi/180], [10,2,90*np.pi/180], [10,2,45*np.pi/180], # 0-2
-        [8,5,135*np.pi/180], [8,5,90*np.pi/180], [8,5,45*np.pi/180], # 3-5
-        [12,6,135*np.pi/180], [12,6,90*np.pi/180], [12,6,45*np.pi/180], # 6-8
-        [11,8,135*np.pi/180], [11,8,90*np.pi/180], [11,8,45*np.pi/180], # 9-11
-        [2,7,135*np.pi/180], [2,7,90*np.pi/180], [2,7,45*np.pi/180], # 12-14
-        [5,10,135*np.pi/180], [5,10,90*np.pi/180], [5,10,45*np.pi/180]]).astype(np.float32) #15-17
+def unitTest1():
+    states = np.array([[10,2,45*np.pi/180], [10,2,0*np.pi/180], [10,2,-45*np.pi/180], # 0-2
+        [8,5,45*np.pi/180], [8,5,0*np.pi/180], [8,5,-45*np.pi/180], # 3-5
+        [12,6,45*np.pi/180], [12,6,0*np.pi/180], [12,6,-45*np.pi/180], # 6-8
+        [11,8,45*np.pi/180], [11,8,0*np.pi/180], [11,8,-45*np.pi/180], # 9-11
+        [2,7,45*np.pi/180], [2,7,0*np.pi/180], [2,7,-45*np.pi/180], # 12-14
+        [5,10,45*np.pi/180], [5,10,0*np.pi/180], [5,10,-45*np.pi/180]]).astype(np.float32) #15-17
+
+    # states[:,1] = -states[:,1]
 
     n0 = [3,4,5,6,7,8]
     n1 = [0,1,2,9,10,11,12,13,14,15,16,17]
@@ -681,14 +697,14 @@ if __name__ == '__main__':
     nn = 3*n0 + 3*n1 + 3*n2 + 3*n3 + 3*n4 + 3*n5
 
     neighbors = np.array(nn).astype(np.int32)
-    num_neighbors = np.array([6,6,6, 12,12,12, 6,6,6, 9,9,9, 6,6,6, 9,9,9]).astype(np.int32)
+    num_neighbors = np.array([len(n0),len(n0),len(n0), len(n1),len(n1),len(n1), len(n2),len(n2),len(n2), len(n3),len(n3),len(n3), len(n4),len(n4),len(n4), len(n5),len(n5),len(n5)]).astype(np.int32)
 
     obstacles = np.array([[7,6,4,9]]).astype(np.float32)
     num_obs = np.array([1]).astype(np.int32)
 
     start = 1
-    goal = 15
-    radius = 2
+    goal = 12
+    radius = 1
     threshold = 10
 
     init_parameters = {'states':states, 'neighbors':neighbors, 'num_neighbors':num_neighbors}
@@ -696,4 +712,109 @@ if __name__ == '__main__':
 
     gmt = GMT(init_parameters, debug=True)
     route = gmt.run_step(iter_parameters, iter_limit=8, debug=True)
+    return route[::-1], states
+
+
+def unitTest2():
+    states = np.array([[-2,5,-45*np.pi/180], [-2,5,0*np.pi/180], [-2,5,45*np.pi/180], # 0-2
+        [0,5,-45*np.pi/180], [0,5,0*np.pi/180], [0,5,45*np.pi/180], # 3-5
+        [2,5,-45*np.pi/180], [2,5,0*np.pi/180], [2,5,45*np.pi/180], # 6-8
+        [4,5,-45*np.pi/180], [4,5,0*np.pi/180], [4,5,45*np.pi/180], # 9-11
+        [6,5,-45*np.pi/180], [6,5,0*np.pi/180], [6,5,45*np.pi/180], # 12-14
+        [8,5,-45*np.pi/180], [8,5,0*np.pi/180], [8,5,45*np.pi/180]]).astype(np.float32) #15-17
+
+    # states[:,1] = -states[:,1]
+
+    n0 = [3,4,5]
+    n1 = [0,1,2,6,7,8]
+    n2 = [3,4,5,9,10,11]
+    n3 = [6,7,8,12,13,14]
+    n4 = [9,10,11,15,16,17]
+    n5 = [12,13,14]
+    nn = 3*n0 + 3*n1 + 3*n2 + 3*n3 + 3*n4 + 3*n5
+
+    neighbors = np.array(nn).astype(np.int32)
+    num_neighbors = np.array([len(n0),len(n0),len(n0), len(n1),len(n1),len(n1), len(n2),len(n2),len(n2), len(n3),len(n3),len(n3), len(n4),len(n4),len(n4), len(n5),len(n5),len(n5)]).astype(np.int32)
+
+    obstacles = np.array([[-10,-10,-10,-10]]).astype(np.float32)
+    num_obs = np.array([0]).astype(np.int32)
+
+    start = 1
+    goal = 15
+    radius = 1
+    threshold = 2
+
+    init_parameters = {'states':states, 'neighbors':neighbors, 'num_neighbors':num_neighbors}
+    iter_parameters = {'start':start, 'goal':goal, 'radius':radius, 'threshold':threshold, 'obstacles':obstacles, 'num_obs':num_obs}
+
+    gmt = GMT(init_parameters, debug=True)
+    route = gmt.run_step(iter_parameters, iter_limit=20, debug=True)
+    return route[::-1], states
+
+def unitTest3():
+    states = np.array([[0,0,135*np.pi/180], [0,0,90*np.pi/180], [0,0,45*np.pi/180], # 0-2
+        [0,-2,135*np.pi/180], [0,-2,90*np.pi/180], [0,-2,45*np.pi/180], # 3-5
+        [0,-4,135*np.pi/180], [0,-4,90*np.pi/180], [0,-4,45*np.pi/180], # 6-8
+        [2,-4,45*np.pi/180], [2,-4,0*np.pi/180], [2,-4,-45*np.pi/180], # 9-11
+        [-2,-4,-135*np.pi/180], [-2,-4,180*np.pi/180], [-2,-4,135*np.pi/180], # 12-14
+        [4,-4,45*np.pi/180], [4,-4,0*np.pi/180], [4,-4,-45*np.pi/180]]).astype(np.float32) #15-17
+
+    # states[:,1] = -states[:,1]
+
+    n0 = [3,4,5]
+    n1 = [0,1,2,6,7,8]
+    n2 = [3,4,5,9,10,11,12,13,14]
+    n3 = [6,7,8,15,16,17]
+    n4 = [6,7,8]
+    n5 = [9,10,11]
+    nn = 3*n0 + 3*n1 + 3*n2 + 3*n3 + 3*n4 + 3*n5
+
+    neighbors = np.array(nn).astype(np.int32)
+    num_neighbors = np.array([len(n0),len(n0),len(n0), len(n1),len(n1),len(n1), len(n2),len(n2),len(n2), len(n3),len(n3),len(n3), len(n4),len(n4),len(n4), len(n5),len(n5),len(n5)]).astype(np.int32)
+
+    obstacles = np.array([[-10,-10,-10,-10]]).astype(np.float32)
+    num_obs = np.array([0]).astype(np.int32)
+
+    start = 1
+    goal = 16
+    radius = 1
+    threshold = 2
+
+    init_parameters = {'states':states, 'neighbors':neighbors, 'num_neighbors':num_neighbors}
+    iter_parameters = {'start':start, 'goal':goal, 'radius':radius, 'threshold':threshold, 'obstacles':obstacles, 'num_obs':num_obs}
+
+    gmt = GMT(init_parameters, debug=True)
+    route = gmt.run_step(iter_parameters, iter_limit=20, debug=True)
+    return route[::-1], states
+
+if __name__ == '__main__':
+    route, states = unitTest2()
     print(route)
+    print(states[route,:])
+
+    x = states[:,0]
+    y = states[:,1]
+    theta = states[:,2]
+    u = np.cos(theta) 
+    v = -np.sin(theta)
+
+    x_r = states[route,0] 
+    y_r = states[route,1]
+    theta_r = states[route,2]
+    u_r = np.cos(theta_r) 
+    v_r = -np.sin(theta_r)
+
+    fig, ax = plt.subplots(nrows=2, ncols=1)
+    ax[0].quiver(x,y,u,v)
+    ax[0].set_title('States')
+    ax[1].quiver(x_r,y_r,u_r,v_r)
+    ax[1].set_title('Route')
+
+    for a in ax.flat:
+        a.set(xlabel='x', ylabel='y')
+
+    # Hide x labels and tick labels for top plots and y ticks for right plots.
+    for a in ax.flat:
+        a.label_outer()
+
+    plt.show()

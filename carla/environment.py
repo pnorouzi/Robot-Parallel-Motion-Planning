@@ -50,65 +50,79 @@ class World(object):
         self.actor_list = []
         self.sensor_buffer = {}
 
-        print('Enabling synchronous mode.')
-        settings = self.world.get_settings()
-        settings.fixed_delta_seconds = 0.05
-        settings.synchronous_mode = True
-        self.world.apply_settings(settings)
+        # print('Enabling synchronous mode.')
+        # settings = self.world.get_settings()
+        # settings.fixed_delta_seconds = 0.05
+        # settings.synchronous_mode = True
+        # self.world.apply_settings(settings)
 
-    def create_samples(self, start, goal, waypoint_dist = 5, disk_radius = 10, num_yaw = 8):
-        print(f'Creating samples {waypoint_dist}m apart with {num_yaw} yaw vaules and neighbors within {disk_radius}m.')
+    def block_road(self):
+        transform = self.map.get_spawn_points()[116]
+        transform.location.x -= 30
+        transform.location.y += 1
+        transform.rotation.yaw += 75 # get random yaw orientation so vehicles don't line up
 
-        wp = []
-        for mp in self.map.generate_waypoints(waypoint_dist):
-            wp.append(mp.transform)
+        bp = self.blueprint_library.filter('police')[0]
 
-        wp.append(start)
-        wp.append(goal)
+        npc = self.world.try_spawn_actor(bp, transform)
 
-        self.waypoints = []
-        self.neighbors = []
+        if npc is not None:
+            self.actor_list.append(npc)
 
-        # for each waypoint wp
-        for i, wi in enumerate(wp):
-            li = wi.location
-            ni = []
-            # find other waypoints within disk radius
-            for j, wj in enumerate(wp):
-                lj = wj.location
-                if li == lj:
-                    continue
-                elif li.distance(lj) <= disk_radius:
-                    # account for index shifts with adding in orientation
-                    for k in range(num_yaw):
-                        if k == (num_yaw)/2:
-                            continue
-                        elif k > (num_yaw)/2:
-                            ni.append(j*(num_yaw-1) + k-1)
-                        else:
-                            ni.append(j*(num_yaw-1) + k)
-            
-            # add in number of yaw orientations to waypoint list        
-            ri = wi.rotation
-            for k in range(num_yaw):
-                if k == (num_yaw)/2:
-                    continue
+        transform.location.x -= 3
+        transform.location.y += 5
 
-                self.neighbors.append(ni)
+        npc = self.world.try_spawn_actor(bp, transform)
 
-                theta = ri.yaw + k*360/(num_yaw)
-                if theta >= 180:
-                    theta = theta - 360
-                elif theta <= -180:
-                    theta = 360 - theta
-                self.waypoints.append([li.x, li.y, theta])
+        if npc is not None:
+            self.actor_list.append(npc)
 
-    def create_obstacles(self, num_obstacles):
+        transform.location.x -= 3
+        transform.location.y += 5
+
+        npc = self.world.try_spawn_actor(bp, transform)
+
+        if npc is not None:
+            self.actor_list.append(npc)
+
+    def swerve_obstacles(self):
+        transform = self.map.get_spawn_points()[116]
+        transform.location.x -= 20
+        transform.location.y += 1
+        transform.rotation.yaw -= 90 # get random yaw orientation so vehicles don't line up
+
+        bp = self.blueprint_library.filter('carlacola')[0]
+
+        npc = self.world.try_spawn_actor(bp, transform)
+
+        if npc is not None:
+            self.actor_list.append(npc)
+
+        transform.location.x -= 13
+        transform.location.y += 9
+        transform.rotation.yaw += 180
+
+        npc = self.world.try_spawn_actor(bp, transform)
+
+        if npc is not None:
+            self.actor_list.append(npc)
+
+        # transform.location.x -= 13
+        # transform.location.y -= 10
+        # transform.rotation.yaw -= 180
+
+        # npc = self.world.try_spawn_actor(bp, transform)
+
+        # if npc is not None:
+        #     self.actor_list.append(npc)
+
+    def random_obstacles(self, num_obstacles):
         print(f'Creating {num_obstacles} obstacles.')
         obstacles = 0
         # continue randomly spawning obstacles until desired number reached
         while obstacles < num_obstacles:
             transform = random.choice(self.world.get_map().get_spawn_points())
+
             transform.rotation.yaw = random.randrange(-180.0, 180.0, 1.0) # get random yaw orientation so vehicles don't line up
 
             bp = random.choice(self.blueprint_library.filter('vehicle')) # random vehicle for fun
@@ -159,7 +173,7 @@ class Camera(object):
         self.world.actor_list.append(self.sensor) # add to actor_list of world so we can clean up later
 
         weak_self = weakref.ref(self)
-        self.sensor.listen(lambda image: Camera.callback(weak_self,image))
+        # self.sensor.listen(lambda image: Camera.callback(weak_self,image))
 
     @staticmethod
     def callback(weak_self, data):
