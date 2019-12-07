@@ -13,7 +13,33 @@ Industrial road | Running from the cops
 
 ## Milestones:
 
-* [Pitch](files/CIS%20565%20Final%20Project%20Final%20project%20Pitch.pdf)
+* [Pitch](files/CIS565_finalProject-pitch.pdf)
 * [Milestone 1](files/CIS565_RPMP-milestone1.pdf)
 * [Milestone 2](files/CIS565_RPMP-milestone2.pdf)
 * [Milestone 3](files/CIS565_RPMP-milestone3.pdf)
+
+# Pipeline
+
+![](images/pipeline.png)
+
+# State Space Samples
+
+CARALA state samples | Up sample orientation 
+:-------------------------:|:-------------------------:
+![](images/carlaStateSample.png)| ![](images/upSampleStates.gif)
+
+# Dubin's Model
+
+Dubin's Model | Example 
+:-------------------------:|:-------------------------:
+![](images/dubinsModel.png)| ![](images/dubinExample.gif)
+
+# GMT* Sampling Based Motion Planning
+
+![](images/gmtExample1.gif)
+
+# Debugging
+
+Unit Test 1 | Unit Test 2 | Unit Test 3 
+:-------------------------:|:-------------------------:|:-------------------------:
+![](images/unitTest1.png)| ![](images/unitTest2.png)| ![](images/unitTest3.png) 
