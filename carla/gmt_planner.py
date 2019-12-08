@@ -22,7 +22,7 @@ class GMT(object):
         self._cpu_init(init_parameters, debug)
         self._gpu_init(debug)
 
-        self.route = None
+        self.route = []
         self.start = 0
 
     def _cpu_init(self, init_parameters, debug):
@@ -59,7 +59,7 @@ class GMT(object):
         self.Vunexplored[self.start] = 1
         self.Vopen[self.start] = 0
 
-        if self.start != iter_parameters['start'] and self.route is not None:
+        if self.start != iter_parameters['start'] and len(self.route) > 2:
             del self.route[-1]
 
         self.obstacles = iter_parameters['obstacles']
@@ -139,7 +139,6 @@ class GMT(object):
 
             if iteration >= iter_limit:
                 print('### iteration limit ###', iteration)
-                # del self.route[-1]
                 return self.route
             elif goal_reached:
                 print('### goal reached ### ', iteration)
@@ -188,13 +187,13 @@ class GMT(object):
                 print('G size: ', gSize, 'G: ', dev_G)
 
                 print('x size: ', dev_xSize, 'x: ', dev_x)
-            iteration_time = end_iter-start_iter
-            print(f'######### iteration: {iteration} iteration time: {iteration_time}')
+                iteration_time = end_iter-start_iter
+                print(f'######### iteration: {iteration} iteration time: {iteration_time}')
 
 
 class GMTstream(object):
     def __init__(self, init_parameters, debug=False):
-        self.route = None
+        self.route = []
         self.start = 0
         self.stream1 = drv.Stream()
         self.stream2 = drv.Stream()
@@ -251,7 +250,7 @@ class GMTstream(object):
         self.Vunexplored[self.start] = 1
         self.Vopen[self.start] = 0
 
-        if self.start != iter_parameters['start'] and self.route is not None:
+        if self.start != iter_parameters['start'] and len(self.route) > 2:
             del self.route[-1]
 
         self.obstacles = iter_parameters['obstacles']
@@ -388,7 +387,7 @@ class GMTstream(object):
 
 class GMTmem(object):
     def __init__(self, init_parameters, debug=False):
-        self.route = None
+        self.route = []
         self.start = 0
         self.stream1 = drv.Stream()
         self.stream2 = drv.Stream()
@@ -445,7 +444,7 @@ class GMTmem(object):
         self.Vunexplored[self.start] = 1
         self.Vopen[self.start] = 0
 
-        if self.start != iter_parameters['start'] and self.route is not None:
+        if self.start != iter_parameters['start'] and len(self.route) > 2:
             del self.route[-1]
 
         self.obstacles = iter_parameters['obstacles']
