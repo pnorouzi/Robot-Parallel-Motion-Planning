@@ -24,6 +24,8 @@ import random
 import time
 import threading
 from timeit import default_timer as timer
+import pandas as pd
+import matplotlib.pyplot as plt
 
 import carla
 from agents.navigation.basic_agent import BasicAgent
@@ -36,7 +38,7 @@ SYNC = False
 DEBUG = False
 NUM_OBSTACLES = 25
 SPAWN_POINT_INDICES = [116,198]
-AGENT = 'cuda'
+AGENT = 'test'
 
 
 
@@ -91,8 +93,28 @@ def game_loop(options_dict):
             agent = CudaAgent(vehicle.vehicle)
             agent.set_destination(vehicle_transform, destination_transform)
         elif options_dict['agent'] == 'test':
+            time = True
             agent = TestAgent(vehicle.vehicle)
-            agent.set_destination(vehicle_transform, destination_transform)
+            agent.set_destination(vehicle_transform, destination_transform, time=time)
+
+            if time:
+                df = agent.time_df
+
+                ax = plt.gca()
+
+                # df.plot(kind='line',x='iteration',y='elapsed', color='red', ax=ax)
+                df.plot(kind='line',x='iteration',y='wavefront',ax=ax)
+                df.plot(kind='line',x='iteration',y='wavefront_compact',ax=ax)
+                df.plot(kind='line',x='iteration',y='open_compact',ax=ax)
+                df.plot(kind='line',x='iteration',y='neighbors',ax=ax)
+                df.plot(kind='line',x='iteration',y='neighbors_compact',ax=ax)
+                df.plot(kind='line',x='iteration',y='connection',ax=ax)
+
+                plt.xlabel('iteration')
+                plt.ylabel('time (s)')
+               
+
+                plt.show()
         else:
             agent = BasicAgent(vehicle.vehicle)
             agent.set_destination((destination_transform.location.x, destination_transform.location.y, destination_transform.location.z))

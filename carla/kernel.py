@@ -484,4 +484,12 @@ mod = SourceModule("""
             x[scan[index]] = waypoints[index];
         }
     }
+
+    __global__ void growThreshold(float *threshold, float *amount, const int *n){
+        const int index = threadIdx.x + (blockIdx.x * blockDim.x);
+        if(index >= 1){
+            return;
+        }
+        threshold[0] = threshold[0] + 2.0*amount[0];
+    }
 """)
