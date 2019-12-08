@@ -23,6 +23,7 @@ import numpy as np
 import random
 import time
 import threading
+from timeit import default_timer as timer
 
 import carla
 from agents.navigation.basic_agent import BasicAgent
@@ -33,7 +34,7 @@ from environment import *
 
 SYNC = False
 DEBUG = False
-NUM_OBSTACLES = 0
+NUM_OBSTACLES = 25
 SPAWN_POINT_INDICES = [116,198]
 AGENT = 'cuda'
 
@@ -109,6 +110,7 @@ def game_loop(options_dict):
         prev_location = vehicle.vehicle.get_location()
         sp = 2
         while True:
+
             # wait for server to be ready
             world.world.tick()
             world_snapshot = world.world.wait_for_tick(10.0)

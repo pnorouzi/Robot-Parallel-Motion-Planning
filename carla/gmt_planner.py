@@ -515,7 +515,7 @@ class GMTmem(object):
             gSize = int(dev_gSize.get_async(stream=self.stream1))
 
             if iteration >= iter_limit:
-                print('### iteration limit ###')
+                print('### iteration limit ###', iteration)
                 return self.route
             elif goal_reached:
                 print('### goal reached ### ', iteration)

@@ -28,6 +28,7 @@ class CudaAgent(Agent):
         self.obstacle_list = []
         self.plan = True
         self.done = False
+        self.iteration_limit = 60
 
         self._dt = 1.0 / 20.0
         args_lateral_dict = {
@@ -175,33 +176,33 @@ class CudaAgent(Agent):
         # obstacle detection #
         # path planning #
 
-        self.obstacles = np.array([[-1,-1,-1,-1]]).astype(np.float32)
-        self.num_obs = self.num_obs = np.array([0]).astype(np.int32)
+        # self.obstacles = np.array([[-1,-1,-1,-1]]).astype(np.float32)
+        # self.num_obs = self.num_obs = np.array([0]).astype(np.int32)
 
-        # obstacles = []
-        # for vehicle in self._world.get_actors().filter('vehicle.*'):
-        #         # draw Box
-        #         bb_points = CudaAgent._create_bb_points(vehicle)
-        #         global_points= CudaAgent._vehicle_to_world(bb_points, vehicle)
-        #         global_points /= global_points[3,:]
+        obstacles = []
+        for vehicle in self._world.get_actors().filter('vehicle.*'):
+                # draw Box
+                bb_points = CudaAgent._create_bb_points(vehicle)
+                global_points= CudaAgent._vehicle_to_world(bb_points, vehicle)
+                global_points /= global_points[3,:]
 
-        #         my_bb_points = CudaAgent._create_bb_points(self._vehicle)
-        #         my_global_points = CudaAgent._vehicle_to_world(my_bb_points, self._vehicle)
+                my_bb_points = CudaAgent._create_bb_points(self._vehicle)
+                my_global_points = CudaAgent._vehicle_to_world(my_bb_points, self._vehicle)
 
-        #         my_global_points /= my_global_points[3,:]
-        #         dist = np.sqrt((my_global_points[0,2]-global_points[0,2])**2 + (my_global_points[1,2]-global_points[1,2])**2 + (my_global_points[2,2]-global_points[2,2])**2)
+                my_global_points /= my_global_points[3,:]
+                dist = np.sqrt((my_global_points[0,2]-global_points[0,2])**2 + (my_global_points[1,2]-global_points[1,2])**2 + (my_global_points[2,2]-global_points[2,2])**2)
 
-        #         if 0<dist <=30:
-        #             vehicle_box = [global_points[0,0],global_points[1,0],global_points[0,1],global_points[1,1]]
-        #             obstacles.append(vehicle_box)
+                if 0<dist <=30:
+                    vehicle_box = [global_points[0,0],global_points[1,0],global_points[0,1],global_points[1,1]]
+                    obstacles.append(vehicle_box)
 
-        # print('number of near obstacles: ', len(obstacles))
-        # if len(obstacles) == 0:
-        #     self.obstacles = np.array([[-1,-1,-1,-1]]).astype(np.float32)
-        #     self.num_obs = self.num_obs = np.array([0]).astype(np.int32)
-        # else:
-        #     self.obstacles = np.array(obstacles).astype(np.float32)
-        #     self.num_obs = self.num_obs = np.array([self.obstacles.shape[0]]).astype(np.int32)
+        print('number of near obstacles: ', len(obstacles))
+        if len(obstacles) == 0:
+            self.obstacles = np.array([[-1,-1,-1,-1]]).astype(np.float32)
+            self.num_obs = self.num_obs = np.array([0]).astype(np.int32)
+        else:
+            self.obstacles = np.array(obstacles).astype(np.float32)
+            self.num_obs = self.num_obs = np.array([self.obstacles.shape[0]]).astype(np.int32)
 
         self.radius = 2
         self.threshold  = 1
@@ -213,8 +214,10 @@ class CudaAgent(Agent):
         iter_parameters = {'start':self.start, 'goal':self.goal, 'radius':self.radius/angle, 'threshold':self.threshold/angle, 'obstacles':self.obstacles, 'num_obs':self.num_obs}
         
         start_plan = timer()
-        route = self.gmt_planner.run_step(iter_parameters, iter_limit=60, debug=debug)
+        route = self.gmt_planner.run_step(iter_parameters, iter_limit=self.iteration_limit, debug=debug)
         end_plan = timer()
+
+        # self.iteration_limit -= 1
 
         print("elapsed time: ", end_plan-start_plan)
 
