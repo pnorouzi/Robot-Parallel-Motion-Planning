@@ -37,20 +37,20 @@ Autonomous vehicles are a new sensation of the 21st-century economy. Many big/sm
 
 An autonomous vehicle needs to be able to do the following 4: 
 
-1. Identify:
+**1. Identify:**
 
 An autonomous vehicle needs to be able to comprehend its surroundings and identify objects that may affect its decision making. Identification is usually done using the car's perception/vision system. The perception system usually consists of a combination of RGB cameras, Lidar and Radar.
 
-2. Predict:
+**2. Predict:**
 
 Now that the vehicle knows about objects surrounding it, it needs to predict surroundings behavior over a short and long time so the vehicle can appropriately behave in various scenarios. For example, If a car is moving on the lane next to it is moving at 30 MPH, the vehicle should be able to predict what the car is going to do in the next 5 seconds. 
 
-**3. Decide**:
+**3. Decide:**
 
 With the current knowledge of the surroundings and the desired destination, the car then needs to decide on how to move (motion planning) to reach the desired goal safely and efficiently.
 
 
-4. Execute:
+**4. Execute:**
 
 When a decision is made by the car's computer system, the car needs to be able to appropriately execute the plan in the environment that it is in using its engine wheel and transmission system
 
