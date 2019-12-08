@@ -92,8 +92,8 @@ def game_loop(options_dict):
         sensor_bp = ['sensor.camera.rgb', "sensor.camera.semantic_segmentation", "sensor.camera.depth"]
         sensor_transform = carla.Transform(carla.Location(x= 2.5,z=2))
 
-        rgb_camera = Camera(sensor_bp[0], sensor_transform, vehicle, agent,record = True)
-        #segment= Camera(sensor_bp[1], sensor_transform, vehicle, agent)
+        depth = Camera(sensor_bp[2], sensor_transform, vehicle, agent)
+        segment= Camera(sensor_bp[1], sensor_transform, vehicle, agent)
 
 
         # run the simulation
@@ -124,7 +124,6 @@ def game_loop(options_dict):
                 print('distance from destination: ', current_location.distance(destination_point))
                 # if out of destinations break else go to next destination
                 if len(options_dict['spawn_point_indices']) <= sp:
-                    rgb_camera.video_recorder.release()
                     break
                 else:
                     destination_point = spawn_points[options_dict['spawn_point_indices'][sp]].location
