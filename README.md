@@ -80,11 +80,20 @@ To be able to run our code, ...
 
 In this section we go through our implementation that allows our virtual [Tesla Model 3](https://twitter.com/elonmusk?ref_src=twsrc%5Egoogle%7Ctwcamp%5Eserp%7Ctwgr%5Eauthor) drive around the city so smoothly!
 
+## Enviroments:
+
+There are 3 different subsystems/environments that work with each other enabling our autonomous car to perform its tasks. CARLA, as the simulator, gives us the actual environment, obstacles, physics rules, etc. [PyCuda](https://documen.tician.de/pycuda/) (that is a Cuda wrapper for Python), on the other hand, deals with all the operations that need to be done in the GPU. Python is the binding environment between CARLA and PyCuda. Python gets environment information from CARLA and transfers it appropriately to PyCuda for GPU operations. After Path calculation on the GPU, python transfers the path to CARLA to be executed in the environment. You can see the three systems' interactions in the figure below:
+
+<p align="center">
+  <img src="images/enviroment.png">
+</p>
+
+
 ### Pipeline:
 
-![](images/pipeline.png)
-
-## Enviroments:
+<p align="center">
+  <img src="images/pipeline.png">
+</p>
 
 
 
@@ -127,6 +136,6 @@ Unit Test 1 | Unit Test 2 | Unit Test 3
 FMT: https://arxiv.org/pdf/1306.3532.pdf
 GMT: https://arxiv.org/abs/1705.02403
 CARLA: http://carla.org/
-
+PyCuda: https://documen.tician.de/pycuda/
 
 
