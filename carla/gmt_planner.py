@@ -435,7 +435,7 @@ class GMTmem(object):
         self.dev_xindicator_zeros.fill(self.zero_val, stream = self.stream1)
         
 
-        self.stream1.synchronize()
+        # self.stream1.synchronize()
         self.stream2.synchronize()
 
 

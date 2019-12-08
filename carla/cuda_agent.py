@@ -118,8 +118,8 @@ class CudaAgent(Agent):
         print(f'start: {self.start} goal: {self.goal} total states: {self.states.shape[0]}')
         print(f'start location: {self.states[self.start]}, goal location: {self.states[self.goal]}')
 
-        self.gmt_planner = GMT(init_parameters, debug=False)
-        # self.gmt_planner = GMTmem(init_parameters, debug=False)
+        # self.gmt_planner = GMT(init_parameters, debug=False)
+        self.gmt_planner = GMTmem(init_parameters, debug=False)
         # self.gmt_planner = GMTstream(init_parameters, debug=False)
 
     @staticmethod
@@ -203,17 +203,20 @@ class CudaAgent(Agent):
         #     self.obstacles = np.array(obstacles).astype(np.float32)
         #     self.num_obs = self.num_obs = np.array([self.obstacles.shape[0]]).astype(np.int32)
 
+        self.radius = 2
+        self.threshold  = 1
+
         closest_speed = self.steering_curve[:,0] - self.current_speed
         idx = np.argmin(closest_speed)
         angle = self.steering_curve[idx,1]
 
         iter_parameters = {'start':self.start, 'goal':self.goal, 'radius':self.radius/angle, 'threshold':self.threshold/angle, 'obstacles':self.obstacles, 'num_obs':self.num_obs}
         
-        start = timer()
+        start_plan = timer()
         route = self.gmt_planner.run_step(iter_parameters, iter_limit=60, debug=debug)
-        end = timer()
+        end_plan = timer()
 
-        print("elapsed time: ", end-start)
+        print("elapsed time: ", end_plan-start_plan)
 
         if debug:
             print('route: ', route)
@@ -226,13 +229,9 @@ class CudaAgent(Agent):
         self.current_location = self._vehicle.get_transform()
         self.current_speed = get_speed(self._vehicle)
 
-        self.radius = 2
-        self.threshold  = 1
-
         if self.plan and not self.done:
             self.plan = False
             self.route = self._trace_route(debug) # get plan
-            print('length:', len(self.route))
 
             if len(self.route) <= 2:
                 wp = self.start

@@ -140,14 +140,7 @@ class Car(object):
         bp = self.world.blueprint_library.filter(vehicle_bp)[0]
         self.vehicle_transform = transform
         self.vehicle = self.world.world.spawn_actor(bp, self.vehicle_transform)
-        self.world.actor_list.append(self.vehicle) # add to actor_list of world so we can clean up later
-
-        steering_list = []
-        for v in self.vehicle.get_physics_control().steering_curve:
-            steering_list.append([v.x, v.y])
-
-        self.steering_curve = np.array(steering_list)      
-
+        self.world.actor_list.append(self.vehicle) # add to actor_list of world so we can clean up later 
 
 class Camera(object):
 
