@@ -125,6 +125,7 @@ class GMT(object):
             start_wave_c = timer() ############################# timer
             self.dev_threshold += 2*self.dev_radius
             goal_reached = self.dev_Gindicator[self.goal].get() == 1
+            end_wave_c = timer() ############################# timer
             
             dev_Gscan = cuda.to_gpu(self.dev_Gindicator)
             exclusiveScan(dev_Gscan)
@@ -146,7 +147,7 @@ class GMT(object):
 
             dev_G = cuda.zeros(gSize, dtype=np.int32)
             compact(dev_G, dev_Gscan, self.dev_Gindicator, self.dev_waypoints, self.dev_n, block=(self.threadsPerBlock,1,1), grid=(self.nBlocksPerGrid,1))     
-            end_wave_c = timer() ############################# timer
+            
 
             ######### scan and compact open set to connect neighbors ###############
             start_open = timer() ############################# timer
@@ -572,15 +573,6 @@ class GMTstream(object):
             start_iter = timer()
             iteration += 1
 
-            ######### scan and compact open set to connect neighbors ###############
-            dev_yscan = cuda.to_gpu_async(self.dev_open, stream=self.stream2)
-            exclusiveScan(dev_yscan, stream=self.stream2)
-            dev_ySize = dev_yscan[-1] + self.dev_open[-1]
-            ySize = int(dev_ySize.get_async(stream=self.stream2))
-
-            dev_y = cuda.zeros(ySize, dtype=np.int32)
-            compact(dev_y, dev_yscan, self.dev_open, self.dev_waypoints, self.dev_n, block=(self.threadsPerBlock,1,1), grid=(self.nBlocksPerGrid,1), stream=self.stream2)
-
             ########## create Wave front ###############
             wavefront(self.dev_Gindicator, self.dev_open, self.dev_cost, self.dev_threshold, self.dev_n, block=(self.threadsPerBlock,1,1), grid=(self.nBlocksPerGrid,1), stream=self.stream1)
             self.dev_threshold += 2*self.dev_radius
@@ -606,6 +598,15 @@ class GMTstream(object):
 
             dev_G = cuda.zeros(gSize, dtype=np.int32)
             compact(dev_G, dev_Gscan, self.dev_Gindicator, self.dev_waypoints, self.dev_n, block=(self.threadsPerBlock,1,1), grid=(self.nBlocksPerGrid,1), stream=self.stream1)    
+
+            ######### scan and compact open set to connect neighbors ###############
+            dev_yscan = cuda.to_gpu_async(self.dev_open, stream=self.stream2)
+            exclusiveScan(dev_yscan, stream=self.stream2)
+            dev_ySize = dev_yscan[-1] + self.dev_open[-1]
+            ySize = int(dev_ySize.get_async(stream=self.stream2))
+
+            dev_y = cuda.zeros(ySize, dtype=np.int32)
+            compact(dev_y, dev_yscan, self.dev_open, self.dev_waypoints, self.dev_n, block=(self.threadsPerBlock,1,1), grid=(self.nBlocksPerGrid,1), stream=self.stream2)
 
             ########## creating neighbors of wave front to connect open ###############
             dev_xindicator = cuda.zeros_like(self.dev_open, dtype=np.int32)

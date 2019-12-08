@@ -120,8 +120,8 @@ class CudaAgent(Agent):
         print(f'start location: {self.states[self.start]}, goal location: {self.states[self.goal]}')
 
         # self.gmt_planner = GMT(init_parameters, debug=False)
-        self.gmt_planner = GMTmem(init_parameters, debug=False)
-        # self.gmt_planner = GMTstream(init_parameters, debug=False)
+        # self.gmt_planner = GMTmem(init_parameters, debug=False)
+        self.gmt_planner = GMTstream(init_parameters, debug=False)
 
     @staticmethod
     def _create_bb_points(vehicle):
