@@ -112,7 +112,7 @@ class CudaAgent(Agent):
         self.neighbors = np.array(neighbors).astype(np.int32)
         self.num_neighbors = np.array(num_neighbors).astype(np.int32)
 
-        init_parameters = {'states':self.states, 'neighbors':self.neighbors, 'num_neighbors':self.num_neighbors}
+        init_parameters = {'states':self.states, 'neighbors':self.neighbors, 'num_neighbors':self.num_neighbors, 'threadsPerBlock':128}
         self.start = self.states.shape[0] - 1
         self.goal = self.states.shape[0] - 2
 
@@ -275,6 +275,7 @@ class CudaAgent(Agent):
         self.start = route_location[new_start]
         if oldStart != self.start:
             self.plan = True
+            print('changed start: ', self.start)
 
 
 
