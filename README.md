@@ -59,11 +59,13 @@ This project is mainly focused on number **3. Decide**. We implemented GMT* moti
 
 ### Parrallel Motion Planning on the GPU:
 
-The power of the GPU can be used 
+Motion planning algorithms are meant to help an autonomous robot to find a sequence of valid configurations that moves it from the source to the desired destination. Due to the sequential nature of the task, many different sequential algorithms can successfully achieve this in various scenarios. One example of such an algorithm is [FMT*(Fast Marching Tree)](https://arxiv.org/pdf/1306.3532.pdf). Although FMT* works great for high dimensional state space, due to its sequential nature it is not able to be run on the GPU. For the algorithm to be able to be run on the GPU, we need to alter the algorithm to be able to run in parallel at some abstract level. This where [GMT* (Group Marching Tree)](https://arxiv.org/abs/1705.02403) paper comes into play. Brian Itcher et al proposed a variation to the FMT* that would allow it to run on the GPU. We implemented the algorithm on the GPU and tested our result on CARLA driving simulator. We will discuss the algorithm in more detail later in the read me!
 
 ### CARLA:
 
-We are going to be using 
+Our testing environment for this project is [CARLA driving simulator](http://carla.org/), which is an open-source development, training, and validation environment for autonomous driving systems. CARLA is built on top of UE4 and has a python client API that allows us to engage with a car and driving environment. We decided to go with CARLA due to time and financial resources (check our bloopers :D) that an actual robot would have taken from us to complete this project.
+
+### Build:
 
 ## GMT* Algorithm:
 
@@ -113,5 +115,9 @@ Unit Test 1 | Unit Test 2 | Unit Test 3
 * [Milestone 3](files/CIS565_RPMP-milestone3.pdf)
 
 ## Credits/Sources:
+
+FMT: https://arxiv.org/pdf/1306.3532.pdf
+GMT: https://arxiv.org/abs/1705.02403
+
 
 
