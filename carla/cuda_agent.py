@@ -5,14 +5,13 @@ from timeit import default_timer as timer
 
 import carla
 from agents.navigation.agent import Agent, AgentState
-from agents.tools.misc import draw_waypoints
-from agents.tools.misc import get_speed
+from agents.tools.misc import *
 
 from localized_controller import VehiclePIDController
 from gmt_planner import *
 
 class CudaAgent(Agent):
-    def __init__(self, vehicle, target_speed=50):
+    def __init__(self, vehicle, target_speed=30):
         """
         :param vehicle: actor to apply to local planner logic onto
         """
@@ -28,6 +27,7 @@ class CudaAgent(Agent):
         self.obstacle_list = []
         self.plan = True
         self.done = False
+        self.waypoint = None
 
         self._dt = 1.0 / 20.0
         args_lateral_dict = {
@@ -175,33 +175,33 @@ class CudaAgent(Agent):
         # obstacle detection #
         # path planning #
 
-        self.obstacles = np.array([[-1,-1,-1,-1]]).astype(np.float32)
-        self.num_obs = self.num_obs = np.array([0]).astype(np.int32)
+        # self.obstacles = np.array([[-1,-1,-1,-1]]).astype(np.float32)
+        # self.num_obs = self.num_obs = np.array([0]).astype(np.int32)
 
-        # obstacles = []
-        # for vehicle in self._world.get_actors().filter('vehicle.*'):
-        #         # draw Box
-        #         bb_points = CudaAgent._create_bb_points(vehicle)
-        #         global_points= CudaAgent._vehicle_to_world(bb_points, vehicle)
-        #         global_points /= global_points[3,:]
+        obstacles = []
+        for vehicle in self._world.get_actors().filter('vehicle.*'):
+                # draw Box
+                bb_points = CudaAgent._create_bb_points(vehicle)
+                global_points= CudaAgent._vehicle_to_world(bb_points, vehicle)
+                global_points /= global_points[3,:]
 
-        #         my_bb_points = CudaAgent._create_bb_points(self._vehicle)
-        #         my_global_points = CudaAgent._vehicle_to_world(my_bb_points, self._vehicle)
+                my_bb_points = CudaAgent._create_bb_points(self._vehicle)
+                my_global_points = CudaAgent._vehicle_to_world(my_bb_points, self._vehicle)
 
-        #         my_global_points /= my_global_points[3,:]
-        #         dist = np.sqrt((my_global_points[0,2]-global_points[0,2])**2 + (my_global_points[1,2]-global_points[1,2])**2 + (my_global_points[2,2]-global_points[2,2])**2)
+                my_global_points /= my_global_points[3,:]
+                dist = np.sqrt((my_global_points[0,2]-global_points[0,2])**2 + (my_global_points[1,2]-global_points[1,2])**2 + (my_global_points[2,2]-global_points[2,2])**2)
 
-        #         if 0<dist <=30:
-        #             vehicle_box = [global_points[0,0],global_points[1,0],global_points[0,1],global_points[1,1]]
-        #             obstacles.append(vehicle_box)
+                if 0<dist <=30:
+                    vehicle_box = [global_points[0,0],global_points[1,0],global_points[0,1],global_points[1,1]]
+                    obstacles.append(vehicle_box)
 
-        # print('number of near obstacles: ', len(obstacles))
-        # if len(obstacles) == 0:
-        #     self.obstacles = np.array([[-1,-1,-1,-1]]).astype(np.float32)
-        #     self.num_obs = self.num_obs = np.array([0]).astype(np.int32)
-        # else:
-        #     self.obstacles = np.array(obstacles).astype(np.float32)
-        #     self.num_obs = self.num_obs = np.array([self.obstacles.shape[0]]).astype(np.int32)
+        print('number of near obstacles: ', len(obstacles))
+        if len(obstacles) == 0:
+            self.obstacles = np.array([[-1,-1,-1,-1]]).astype(np.float32)
+            self.num_obs = self.num_obs = np.array([0]).astype(np.int32)
+        else:
+            self.obstacles = np.array(obstacles).astype(np.float32)
+            self.num_obs = self.num_obs = np.array([self.obstacles.shape[0]]).astype(np.int32)
 
         self.radius = 2
         self.threshold  = 1
@@ -213,7 +213,7 @@ class CudaAgent(Agent):
         iter_parameters = {'start':self.start, 'goal':self.goal, 'radius':self.radius/angle, 'threshold':self.threshold/angle, 'obstacles':self.obstacles, 'num_obs':self.num_obs}
         
         start_plan = timer()
-        route = self.gmt_planner.run_step(iter_parameters, iter_limit=60, debug=debug)
+        route = self.gmt_planner.run_step(iter_parameters, iter_limit=100, debug=debug)
         end_plan = timer()
 
         print("elapsed time: ", end_plan-start_plan)
@@ -228,6 +228,8 @@ class CudaAgent(Agent):
         # velocity estimation #
         self.current_location = self._vehicle.get_transform()
         self.current_speed = get_speed(self._vehicle)
+
+        hazard_detected = False
 
         if self.plan and not self.done:
             self.plan = False
@@ -246,7 +248,19 @@ class CudaAgent(Agent):
 
         if self.done:
             return self.emergency_stop()
-        control = self._vehicle_controller.run_step(self._target_speed, self.current_speed, self.waypoint, self.current_location) # execute first step of plan
+
+        light_state, traffic_light = self._is_light_red()
+        if light_state:
+            if debug:
+                print('=== RED LIGHT AHEAD [{}])'.format(traffic_light.id))
+
+            self._state = AgentState.BLOCKED_RED_LIGHT
+            hazard_detected = True
+
+        if hazard_detected:
+            control = self.emergency_stop()
+        else:
+            control = self._vehicle_controller.run_step(self._target_speed, self.current_speed, self.waypoint, self.current_location) # execute first step of plan
 
         if debug: # draw plan
             trace_route = []
@@ -272,6 +286,56 @@ class CudaAgent(Agent):
         self.start = route_location[new_start]
         if oldStart != self.start:
             self.plan = True
+
+    def _is_light_red(self, debug=False):
+        """
+        This method is specialized to check US style traffic lights.
+
+        :param lights_list: list containing TrafficLight objects
+        :return: a tuple given by (bool_flag, traffic_light), where
+                 - bool_flag is True if there is a traffic light in RED
+                   affecting us and False otherwise
+                 - traffic_light is the object itself or None if there is no
+                   red traffic light affecting us
+        """
+        lights_list = self._world.get_actors().filter("*traffic_light*")
+
+        ego_vehicle_location = self._vehicle.get_location()
+        ego_vehicle_waypoint = self._map.get_waypoint(ego_vehicle_location)
+
+        if ego_vehicle_waypoint.is_intersection:
+            # It is too late. Do not block the intersection! Keep going!
+            return (False, None)
+
+        if self.waypoint is not None:
+            if self.waypoint.is_intersection:
+                min_angle = 180.0
+                sel_magnitude = 0.0
+                sel_traffic_light = None
+                for traffic_light in lights_list:
+                    loc = traffic_light.get_location()
+                    magnitude, angle = compute_magnitude_angle(loc,
+                                                               ego_vehicle_location,
+                                                               self._vehicle.get_transform().rotation.yaw)
+                    if magnitude < 60.0 and angle < min(25.0, min_angle):
+                        sel_magnitude = magnitude
+                        sel_traffic_light = traffic_light
+                        min_angle = angle
+
+                if sel_traffic_light is not None:
+                    if debug:
+                        print('=== Magnitude = {} | Angle = {} | ID = {}'.format(
+                            sel_magnitude, min_angle, sel_traffic_light.id))
+
+                    if self._last_traffic_light is None:
+                        self._last_traffic_light = sel_traffic_light
+
+                    if self._last_traffic_light.state == carla.TrafficLightState.Red:
+                        return (True, self._last_traffic_light)
+                else:
+                    self._last_traffic_light = None
+
+        return (False, None)
 
 
 

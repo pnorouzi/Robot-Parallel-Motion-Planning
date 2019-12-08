@@ -25,6 +25,7 @@ import weakref
 
 import numpy as np
 import cv2
+from cv2 import VideoWriter, VideoWriter_fourcc
 from collections import defaultdict
 
 import carla
@@ -166,7 +167,7 @@ class Camera(object):
 
         if record:
             fourcc = VideoWriter_fourcc(*'MP42')
-            self.video_recorder = VideoWriter('./camera_view.avi', fourcc, float(30), (IM_WIDTH, IM_HEIGHT))
+            self.video_recorder = VideoWriter('./_out/camera_view.avi', fourcc, float(30), (IM_WIDTH, IM_HEIGHT))
             self.sensor.listen(lambda image: Camera.callback(weak_self,image))
 
     @staticmethod
@@ -230,7 +231,7 @@ class Camera(object):
         image = image.reshape((IM_HEIGHT,IM_WIDTH,4))
         image = image[:,:,:3]
 
-        image = image.astype(np.unit8)
+        image = image.astype(np.uint8)
 
         self.video_recorder.write(image)
 

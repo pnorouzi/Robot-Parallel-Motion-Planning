@@ -232,11 +232,11 @@ class TestAgent(Agent):
 
         print("elapsed time: ", end_timer-start_timer)    
 
-        trace_route = []
-        for r in route:
-            wp = carla.Transform(carla.Location(self.states[r][0].item(), self.states[r][1].item(), 1.2), carla.Rotation(roll=0,pitch=0, yaw=(self.states[r][2]*180/np.pi).item()))
-            trace_route.append(wp)
-        draw_route(self._vehicle.get_world(), trace_route)
+        # trace_route = []
+        # for r in route:
+        #     wp = carla.Transform(carla.Location(self.states[r][0].item(), self.states[r][1].item(), 1.2), carla.Rotation(roll=0,pitch=0, yaw=(self.states[r][2]*180/np.pi).item()))
+        #     trace_route.append(wp)
+        # draw_route(self._vehicle.get_world(), trace_route)
 
         index = len(route)-1
         trace_route = []
@@ -247,7 +247,7 @@ class TestAgent(Agent):
 
         return trace_route
 
-    def run_step(self, debug=False):
+    def run_step(self, debug=True):
         """
         Execute one step of navigation.
         :return: carla.VehicleControl
@@ -274,8 +274,8 @@ class TestAgent(Agent):
             hazard_detected = True
 
         # check for the state of the traffic lights
-        light_state, traffic_light = False, None # 
-        # light_state, traffic_light = self._is_light_red(lights_list)
+        # light_state, traffic_light = False, None # 
+        light_state, traffic_light = self._is_light_red(lights_list)
         if light_state:
             if debug:
                 print('=== RED LIGHT AHEAD [{}])'.format(traffic_light.id))
