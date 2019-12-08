@@ -26,6 +26,7 @@ class CudaAgent(Agent):
         self.current_location = self._vehicle.get_transform() 
         self.current_speed = get_speed(self._vehicle)
         self.obstacle_list = []
+        self.plan = True
 
         self._dt = 1.0 / 20.0
         args_lateral_dict = {
@@ -41,9 +42,14 @@ class CudaAgent(Agent):
 
         self._vehicle_controller = VehiclePIDController(self._vehicle, args_lateral=args_lateral_dict, args_longitudinal=args_longitudinal_dict)
 
-    def set_destination(self, location):
-        self.start_waypoint = self._map.get_waypoint(self._vehicle.get_location())
-        self.end_waypoint = self._map.get_waypoint(carla.Location(location[0], location[1], location[2]))
+        steering_list = []
+        for v in self._vehicle.get_physics_control().steering_curve:
+            steering_list.append([v.x, v.y])
+
+        self.steering_curve = np.array(steering_list)    
+
+    def set_destination(self, start_waypoint, end_waypoint):
+        self.create_samples(start_waypoint, end_waypoint)
 
     def create_samples(self, start, goal, waypoint_dist = 4, disk_radius = 4*math.sqrt(2), num_yaw = 8):
         print(f'Creating samples {waypoint_dist}m apart with {num_yaw} yaw vaules and neighbors within {disk_radius}m.')
@@ -79,6 +85,8 @@ class CudaAgent(Agent):
                         else:
                             ni.append(j*(num_yaw-1) + k)
                         num += 1
+                        if wj == start or wj == goal:
+                            break
 
             # add in number of yaw orientations to waypoint list        
             ri = wi.rotation
@@ -95,18 +103,23 @@ class CudaAgent(Agent):
                 elif theta <= -180:
                     theta = 360 - theta
                 states.append([li.x, li.y, theta*np.pi/180])
+                if wi == start or wi == goal:
+                    break
 
         self.states = np.array(states).astype(np.float32)
         self.neighbors = np.array(neighbors).astype(np.int32)
         self.num_neighbors = np.array(num_neighbors).astype(np.int32)
 
         init_parameters = {'states':self.states, 'neighbors':self.neighbors, 'num_neighbors':self.num_neighbors}
-        self.start = self.states.shape[0] -1*(num_yaw-1)
-        self.goal = self.states.shape[0] - 2*(num_yaw-1)
+        self.start = self.states.shape[0] - 1
+        self.goal = self.states.shape[0] - 2
 
-        print(f'start: {self.start} goal: {self.goal}')
-    
-        self.gmt_planner = GMT(init_parameters, debug=True)
+        print(f'start: {self.start} goal: {self.goal} total states: {self.states.shape[0]}')
+        print(f'start location: {self.states[self.start]}, goal location: {self.states[self.goal]}')
+
+        # self.gmt_planner = GMT(init_parameters, debug=False)
+        self.gmt_planner = GMTmem(init_parameters, debug=False)
+        # self.gmt_planner = GMTstream(init_parameters, debug=False)
 
     @staticmethod
     def _create_bb_points(vehicle):
@@ -161,46 +174,50 @@ class CudaAgent(Agent):
         # obstacle detection #
         # path planning #
 
-        # obstacle_list = [] # detection
-        # gmt(self._vehicle.get_location(), self.end_waypoint, obstacle_list)
-        # waypoint = world.map.get_waypoint(world.player.get_location(), project_to_road=True, lane_type=(carla.LaneType.Driving | carla.LaneType.Shoulder | carla.LaneType.Sidewalk))
-        obstacles = []
-        for vehicle in self._world.get_actors().filter('vehicle.*'):
-                #print(vehicle.bounding_box)
-                # draw Box
-                bb_points = CudaAgent._create_bb_points(vehicle)
-                global_points= CudaAgent._vehicle_to_world(bb_points, vehicle)
-                global_points /= global_points[3,:]
+        self.obstacles = np.array([[-1,-1,-1,-1]]).astype(np.float32)
+        self.num_obs = self.num_obs = np.array([0]).astype(np.int32)
 
-                my_bb_points = CudaAgent._create_bb_points(self._vehicle)
-                my_global_points = CudaAgent._vehicle_to_world(my_bb_points, self._vehicle)
+        # obstacles = []
+        # for vehicle in self._world.get_actors().filter('vehicle.*'):
+        #         # draw Box
+        #         bb_points = CudaAgent._create_bb_points(vehicle)
+        #         global_points= CudaAgent._vehicle_to_world(bb_points, vehicle)
+        #         global_points /= global_points[3,:]
 
-                my_global_points /= my_global_points[3,:]
-                # transform = vehicle.get_transform()
-                # bounding_box = vehicle.bounding_box
-                # bounding_box.location += transform.location
-                # my_location = self.current_location.location
-                dist = np.sqrt((my_global_points[0,2]-global_points[0,2])**2 + (my_global_points[1,2]-global_points[1,2])**2 + (my_global_points[2,2]-global_points[2,2])**2)
+        #         my_bb_points = CudaAgent._create_bb_points(self._vehicle)
+        #         my_global_points = CudaAgent._vehicle_to_world(my_bb_points, self._vehicle)
 
-                if 0<dist <=30:
-                    vehicle_box = [global_points[0,0],global_points[1,0],global_points[0,1],global_points[1,1]]
-                    obstacles.append(vehicle_box)
+        #         my_global_points /= my_global_points[3,:]
+        #         dist = np.sqrt((my_global_points[0,2]-global_points[0,2])**2 + (my_global_points[1,2]-global_points[1,2])**2 + (my_global_points[2,2]-global_points[2,2])**2)
 
-        print('number of near obstacles: ', len(obstacles))
-        if len(obstacles) == 0:
-            self.obstacles = np.array([[-1,-1,-1,-1]]).astype(np.float32)
-            self.num_obs = self.num_obs = np.array([0]).astype(np.int32)
-        else:
-            self.obstacles = np.array(obstacles).astype(np.float32)
-            self.num_obs = self.num_obs = np.array([self.obstacles.shape[0]]).astype(np.int32)
+        #         if 0<dist <=30:
+        #             vehicle_box = [global_points[0,0],global_points[1,0],global_points[0,1],global_points[1,1]]
+        #             obstacles.append(vehicle_box)
 
-        iter_parameters = {'start':self.start, 'goal':self.goal, 'radius':self.radius, 'threshold':self.threshold, 'obstacles':self.obstacles, 'num_obs':self.num_obs}
+        # print('number of near obstacles: ', len(obstacles))
+        # if len(obstacles) == 0:
+        #     self.obstacles = np.array([[-1,-1,-1,-1]]).astype(np.float32)
+        #     self.num_obs = self.num_obs = np.array([0]).astype(np.int32)
+        # else:
+        #     self.obstacles = np.array(obstacles).astype(np.float32)
+        #     self.num_obs = self.num_obs = np.array([self.obstacles.shape[0]]).astype(np.int32)
+
+        print(self.current_speed)
+
+        closest_speed = self.steering_curve[:,0] - self.current_speed
+        idx = np.argmin(closest_speed)
+        angle = self.steering_curve[idx,1]
+
+        iter_parameters = {'start':self.start, 'goal':self.goal, 'radius':self.radius*angle, 'threshold':self.threshold*angle, 'obstacles':self.obstacles, 'num_obs':self.num_obs}
         
-        route = self.gmt_planner.run_step(iter_parameters, iter_limit=10000, debug=debug)
+        start = timer()
+        route = self.gmt_planner.run_step(iter_parameters, iter_limit=60, debug=debug)
+        end = timer()
+
+        print("elapsed time: ", end-start)
 
         if debug:
             print('route: ', route)
-        # del route[-1]
         return route
 
     def run_step(self, debug=False):
@@ -211,18 +228,22 @@ class CudaAgent(Agent):
         self.current_speed = get_speed(self._vehicle)
 
         self.radius = 2
-        self.threshold  = 2
+        self.threshold  = 0.5
 
-        self.route = self._trace_route(debug) # get plan
-        if len(route) == 0:
-            wp = self.start
+        if self.plan:
+            self.plan = False
+            self.route = self._trace_route(debug) # get plan
+
+            if len(self.route) == 0:
+                wp = self.start
+            else:
+                wp = self.route[-2]
+
+            self.waypoint = self._map.get_waypoint(carla.Location(self.states[wp][0].item(), self.states[wp][1].item(), self.current_location.location.z))
         else:
-            wp = self.route[-2]
-            self.start = route[-2]
+            self.update_start()
 
-        waypoint = self._map.get_waypoint(carla.Location(self.states[wp][0].item(), self.states[wp][1].item(), 1.2))
-
-        control = self._vehicle_controller.run_step(self._target_speed, self.current_speed, waypoint, self.current_location) # execute first step of plan
+        control = self._vehicle_controller.run_step(self._target_speed, self.current_speed, self.waypoint, self.current_location) # execute first step of plan
 
         if debug: # draw plan
             trace_route = []
@@ -235,18 +256,20 @@ class CudaAgent(Agent):
 
     def update_start(self):
         self.current_location = self._vehicle.get_transform()
-        route_location = self.route[-1:-3]
-        
+        route_location = self.route[-3::]
+
         current_state = np.array([self.current_location.location.x, self.current_location.location.y , self.current_location.rotation.yaw])
         route_state = self.states[route_location, 0:2]
 
         dist = np.linalg.norm(current_state[0:2]-route_state, axis=1)
-        new_neighbors = np.argmin(dist)
 
-        self.states[self.start, : ] = current_state
-        del self.neighbors[-self.num_neighbors[self.start]:]  
-        # self.neighbors += 
-        self.num_neighbors[self.start] = self.num_neighbors[route_location[new_neighbors]]
+        new_start = np.argmin(dist)
+
+        oldStart = self.start
+        self.start = route_location[new_start]
+        if oldStart != self.start:
+            self.plan = True
+
 
 
 

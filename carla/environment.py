@@ -42,7 +42,7 @@ def sensor_attributes(options_dict):
 
 
 class World(object):
-    def __init__(self, carla_world):
+    def __init__(self, carla_world, sync):
         self.world = carla_world
         
         self.map = self.world.get_map()
@@ -50,11 +50,12 @@ class World(object):
         self.actor_list = []
         self.sensor_buffer = {}
 
-        # print('Enabling synchronous mode.')
-        # settings = self.world.get_settings()
-        # settings.fixed_delta_seconds = 0.05
-        # settings.synchronous_mode = True
-        # self.world.apply_settings(settings)
+        if sync:
+            print('Enabling synchronous mode.')
+            settings = self.world.get_settings()
+            settings.fixed_delta_seconds = 0.05
+            settings.synchronous_mode = True
+            self.world.apply_settings(settings)
 
     def block_road(self):
         transform = self.map.get_spawn_points()[116]
@@ -107,15 +108,6 @@ class World(object):
         if npc is not None:
             self.actor_list.append(npc)
 
-        # transform.location.x -= 13
-        # transform.location.y -= 10
-        # transform.rotation.yaw -= 180
-
-        # npc = self.world.try_spawn_actor(bp, transform)
-
-        # if npc is not None:
-        #     self.actor_list.append(npc)
-
     def random_obstacles(self, num_obstacles):
         print(f'Creating {num_obstacles} obstacles.')
         obstacles = 0
@@ -150,6 +142,11 @@ class Car(object):
         self.vehicle = self.world.world.spawn_actor(bp, self.vehicle_transform)
         self.world.actor_list.append(self.vehicle) # add to actor_list of world so we can clean up later
 
+        steering_list = []
+        for v in self.vehicle.get_physics_control().steering_curve:
+            steering_list.append([v.x, v.y])
+
+        self.steering_curve = np.array(steering_list)      
 
 
 class Camera(object):
@@ -173,7 +170,7 @@ class Camera(object):
         self.world.actor_list.append(self.sensor) # add to actor_list of world so we can clean up later
 
         weak_self = weakref.ref(self)
-        # self.sensor.listen(lambda image: Camera.callback(weak_self,image))
+        self.sensor.listen(lambda image: Camera.callback(weak_self,image))
 
     @staticmethod
     def callback(weak_self, data):
