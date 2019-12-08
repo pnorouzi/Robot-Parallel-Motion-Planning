@@ -23,6 +23,9 @@ import numpy as np
 import random
 import time
 import threading
+from timeit import default_timer as timer
+import pandas as pd
+import matplotlib.pyplot as plt
 
 import carla
 from agents.navigation.basic_agent import BasicAgent
@@ -33,10 +36,12 @@ from environment import *
 
 SYNC = False
 DEBUG = False
-RECORD = True
+RECORD = False
+TIME = False
 NUM_OBSTACLES = 15
 SPAWN_POINT_INDICES = [116,198]
 AGENT = 'test'
+
 
 def game_loop(options_dict):
     world = None
@@ -48,8 +53,8 @@ def game_loop(options_dict):
         client = carla.Client('localhost', 2000)
         client.set_timeout(30.0)
 
-        # print('Changing world to Town 5.')
-        # client.load_world('Town05') 
+        print('Changing world to Town 5.')
+        client.load_world('Town05') 
 
         # create world object
         world = World(client.get_world(), options_dict['sync'])
@@ -64,7 +69,7 @@ def game_loop(options_dict):
         # # add obstacles and get sample nodes
         # world.block_road()
         # world.swerve_obstacles()
-        world.random_obstacles(options_dict['num_obstacles'])
+        # world.random_obstacles(options_dict['num_obstacles'])
 
         # wait for vehicle to land on ground
         world_snapshot = None
@@ -89,8 +94,28 @@ def game_loop(options_dict):
             agent = CudaAgent(vehicle.vehicle)
             agent.set_destination(vehicle_transform, destination_transform)
         elif options_dict['agent'] == 'test':
+            time = options_dict['time']
             agent = TestAgent(vehicle.vehicle)
-            agent.set_destination(vehicle_transform, destination_transform)
+            agent.set_destination(vehicle_transform, destination_transform, time=time)
+
+            if time:
+                df = agent.time_df
+
+                ax = plt.gca()
+
+                # df.plot(kind='line',x='iteration',y='elapsed', color='red', ax=ax)
+                df.plot(kind='line',x='iteration',y='wavefront',ax=ax)
+                df.plot(kind='line',x='iteration',y='wavefront_compact',ax=ax)
+                df.plot(kind='line',x='iteration',y='open_compact',ax=ax)
+                df.plot(kind='line',x='iteration',y='neighbors',ax=ax)
+                df.plot(kind='line',x='iteration',y='neighbors_compact',ax=ax)
+                df.plot(kind='line',x='iteration',y='connection',ax=ax)
+
+                plt.xlabel('iteration')
+                plt.ylabel('time (s)')
+               
+
+                plt.show()
         else:
             agent = BasicAgent(vehicle.vehicle)
             agent.set_destination((destination_transform.location.x, destination_transform.location.y, destination_transform.location.z))
@@ -110,6 +135,7 @@ def game_loop(options_dict):
         prev_location = vehicle.vehicle.get_location()
         sp = 2
         while True:
+
             # wait for server to be ready
             world.world.tick()
             world_snapshot = world.world.wait_for_tick(10.0)
@@ -164,6 +190,7 @@ if __name__ == '__main__':
         'num_obstacles': NUM_OBSTACLES,
         'debug': DEBUG,
         'sync': SYNC,
-        'record': RECORD
+        'record': RECORD,
+        'time':TIME
     }
     game_loop(options_dict)

@@ -2,3 +2,4 @@ numpy
 pycuda
 opencv-python
 networkx
+pandas

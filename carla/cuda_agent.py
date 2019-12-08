@@ -28,6 +28,7 @@ class CudaAgent(Agent):
         self.plan = True
         self.done = False
         self.waypoint = None
+        self.iteration_limit = 60
 
         self._dt = 1.0 / 20.0
         args_lateral_dict = {
@@ -111,16 +112,17 @@ class CudaAgent(Agent):
         self.neighbors = np.array(neighbors).astype(np.int32)
         self.num_neighbors = np.array(num_neighbors).astype(np.int32)
 
-        init_parameters = {'states':self.states, 'neighbors':self.neighbors, 'num_neighbors':self.num_neighbors}
+        init_parameters = {'states':self.states, 'neighbors':self.neighbors, 'num_neighbors':self.num_neighbors, 'threadsPerBlock':128}
         self.start = self.states.shape[0] - 1
         self.goal = self.states.shape[0] - 2
 
         print(f'start: {self.start} goal: {self.goal} total states: {self.states.shape[0]}')
         print(f'start location: {self.states[self.start]}, goal location: {self.states[self.goal]}')
 
-        # self.gmt_planner = GMT(init_parameters, debug=False)
-        self.gmt_planner = GMTmem(init_parameters, debug=False)
+        self.gmt_planner = GMT(init_parameters, debug=False)
+        # self.gmt_planner = GMTmem(init_parameters, debug=False)
         # self.gmt_planner = GMTstream(init_parameters, debug=False)
+        # self.gmt_planner = GMTmemStream(init_parameters, debug=False)
 
     @staticmethod
     def _create_bb_points(vehicle):
@@ -213,8 +215,10 @@ class CudaAgent(Agent):
         iter_parameters = {'start':self.start, 'goal':self.goal, 'radius':self.radius/angle, 'threshold':self.threshold/angle, 'obstacles':self.obstacles, 'num_obs':self.num_obs}
         
         start_plan = timer()
-        route = self.gmt_planner.run_step(iter_parameters, iter_limit=100, debug=debug)
+        route = self.gmt_planner.run_step(iter_parameters, iter_limit=self.iteration_limit, debug=debug)
         end_plan = timer()
+
+        # self.iteration_limit -= 1
 
         print("elapsed time: ", end_plan-start_plan)
 
@@ -286,6 +290,7 @@ class CudaAgent(Agent):
         self.start = route_location[new_start]
         if oldStart != self.start:
             self.plan = True
+            print('changed start: ', self.start)
 
     def _is_light_red(self, debug=False):
         """
