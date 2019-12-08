@@ -120,6 +120,9 @@ class GMT(object):
             ########## create Wave front ###############
             start_wave_f = timer() ############################# timer
             wavefront(self.dev_Gindicator, self.dev_open, self.dev_cost, self.dev_threshold, self.dev_n, block=(self.threadsPerBlock,1,1), grid=(self.nBlocksPerGrid,1))
+            end_wave_f = timer() ############################# timer
+
+            start_wave_c = timer() ############################# timer
             self.dev_threshold += 2*self.dev_radius
             goal_reached = self.dev_Gindicator[self.goal].get() == 1
             
@@ -143,7 +146,7 @@ class GMT(object):
 
             dev_G = cuda.zeros(gSize, dtype=np.int32)
             compact(dev_G, dev_Gscan, self.dev_Gindicator, self.dev_waypoints, self.dev_n, block=(self.threadsPerBlock,1,1), grid=(self.nBlocksPerGrid,1))     
-            end_wave_f = timer() ############################# timer
+            end_wave_c = timer() ############################# timer
 
             ######### scan and compact open set to connect neighbors ###############
             start_open = timer() ############################# timer
@@ -161,7 +164,9 @@ class GMT(object):
             dev_xindicator = cuda.zeros_like(self.dev_open, dtype=np.int32)
             gBlocksPerGrid = int(((gSize + self.threadsPerBlock - 1) / self.threadsPerBlock))
             neighborIndicator(dev_xindicator, dev_G, self.dev_unexplored, self.dev_neighbors, self.dev_num_neighbors, self.neighbors_index, dev_gSize, block=(self.threadsPerBlock,1,1), grid=(gBlocksPerGrid,1))
+            end_neighbor = timer() ############################# timer
 
+            start_neighbor_c = timer()  ############################# timer
             dev_xscan = cuda.to_gpu(dev_xindicator)
             exclusiveScan(dev_xscan)
             dev_xSize = dev_xscan[-1] + dev_xindicator[-1]
@@ -173,7 +178,7 @@ class GMT(object):
 
             dev_x = cuda.zeros(xSize, dtype=np.int32)
             compact(dev_x, dev_xscan, dev_xindicator, self.dev_waypoints, self.dev_n, block=(self.threadsPerBlock,1,1), grid=(self.nBlocksPerGrid,1))
-            end_neighbor = timer() ############################# timer
+            end_neighbor_c = timer()  ############################# timer
 
             ######### connect neighbors ####################
             # # launch planning
@@ -197,8 +202,10 @@ class GMT(object):
                 print('x size: ', dev_xSize, 'x: ', dev_x)
 
             print('wave front timer: ', end_wave_f-start_wave_f)
+            print('wave compact timer: ', end_wave_c-start_wave_c)
             print('open set timer: ', end_open-start_open)
             print('neighbor timer: ', end_neighbor-start_neighbor)
+            print('neighbor compact timer: ', end_neighbor_c-start_neighbor_c)
             print('connection timer: ', end_connect-start_connect)
             iteration_time = end_iter-start_iter
             print(f'######### iteration: {iteration} iteration time: {iteration_time}')
@@ -322,6 +329,9 @@ class GMTmem(object):
             ########## create Wave front ###############
             start_wave_f = timer() ############################# timer
             wavefront(self.dev_Gindicator, self.dev_open, self.dev_cost, self.dev_threshold, self.dev_n, block=(self.threadsPerBlock,1,1), grid=(self.nBlocksPerGrid,1))
+            end_wave_f = timer() ############################# timer
+
+            start_wave_c = timer() ############################# timer
             self.dev_threshold += 2* self.dev_radius
             goal_reached = self.dev_Gindicator[self.goal].get() == 1
             
@@ -349,7 +359,8 @@ class GMTmem(object):
             #dev_G = cuda.zeros(gSize, dtype=np.int32)
             
             compact(dev_G, dev_Gscan, self.dev_Gindicator, self.dev_waypoints, self.dev_n, block=(self.threadsPerBlock,1,1), grid=(self.nBlocksPerGrid,1))    
-            end_wave_f = timer() ############################# timer
+            end_wave_c = timer() ############################# timer
+            
 
 
             ######### scan and compact open set to connect neighbors ###############
@@ -374,7 +385,9 @@ class GMTmem(object):
             drv.memcpy_dtod(self.dev_xindicator.gpudata,self.dev_xindicator_zeros.gpudata,self.dev_xindicator_zeros.nbytes)
             gBlocksPerGrid = int(((gSize + self.threadsPerBlock - 1) / self.threadsPerBlock))
             neighborIndicator(self.dev_xindicator, dev_G, self.dev_unexplored, self.dev_neighbors, self.dev_num_neighbors, self.neighbors_index, dev_gSize, block=(self.threadsPerBlock,1,1), grid=(gBlocksPerGrid,1))
-            
+            end_neighbor = timer() ############################# timer
+
+            start_neighbor_c = timer()  ############################# timer
             dev_xscan = cuda.to_gpu(self.dev_xindicator)
             exclusiveScan(dev_xscan)
 
@@ -397,7 +410,7 @@ class GMTmem(object):
             dev_x = cuda.GPUArray([xSize,],np.int32)
             #dev_x = cuda.zeros(xSize, dtype=np.int32)
             compact(dev_x, dev_xscan, self.dev_xindicator, self.dev_waypoints, self.dev_n, block=(self.threadsPerBlock,1,1), grid=(self.nBlocksPerGrid,1))
-            end_neighbor = timer() ############################# timer
+            end_neighbor_c = timer()  ############################# timer
 
             ######### connect neighbors ####################
             # # launch planning
@@ -420,8 +433,10 @@ class GMTmem(object):
 
                 print('x size: ', dev_xSize, 'x: ', dev_x)
             print('wave front timer: ', end_wave_f-start_wave_f)
+            print('wave compact timer: ', end_wave_c-start_wave_c)
             print('open set timer: ', end_open-start_open)
             print('neighbor timer: ', end_neighbor-start_neighbor)
+            print('neighbor compact timer: ', end_neighbor_c-start_neighbor_c)
             print('connection timer: ', end_connect-start_connect)
             iteration_time = end_iter-start_iter
             print(f'######### iteration: {iteration} iteration time: {iteration_time}')
