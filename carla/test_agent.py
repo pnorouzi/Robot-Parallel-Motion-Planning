@@ -195,7 +195,7 @@ class TestAgent(Agent):
         from start_waypoint to end_waypoint
         """
         self.radius = 2
-        self.threshold  = 0.05
+        self.threshold  = 1
 
         obstacles = []
         for vehicle in self._world.get_actors().filter('vehicle.*'):
