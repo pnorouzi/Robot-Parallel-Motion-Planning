@@ -67,6 +67,8 @@ Our testing environment for this project is [CARLA driving simulator](http://car
 
 ### Build:
 
+To be able to run our code, ...
+
 ## GMT* Algorithm:
 
 ### Sampling Based Motion Planning
@@ -76,11 +78,17 @@ Our testing environment for this project is [CARLA driving simulator](http://car
 
 ## Implementation:
 
-## Enviroments:
+In this section we go through our implementation that allows our virtual [Tesla Model 3](https://twitter.com/elonmusk?ref_src=twsrc%5Egoogle%7Ctwcamp%5Eserp%7Ctwgr%5Eauthor) drive around the city so smoothly!
 
-### Pipeline
+### Pipeline:
 
 ![](images/pipeline.png)
+
+## Enviroments:
+
+
+
+
 
 ### State Space Samples
 
@@ -118,6 +126,7 @@ Unit Test 1 | Unit Test 2 | Unit Test 3
 
 FMT: https://arxiv.org/pdf/1306.3532.pdf
 GMT: https://arxiv.org/abs/1705.02403
+CARLA: http://carla.org/
 
 
 
