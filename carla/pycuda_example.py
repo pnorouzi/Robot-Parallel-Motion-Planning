@@ -7,6 +7,7 @@ from pycuda.compiler import SourceModule
 
 import numpy as np
 import math
+from timeit import default_timer as timer
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
@@ -132,11 +133,7 @@ mod = SourceModule("""
 
         float cost = abs((r_1*theta_1)) + abs((r_2*theta_2)) + sqrtf(powf(V2[0],2) + powf(V2[1],2));
 
-        if (cost> *curCost){
-            return;
-        }
-
-        *curCost = cost;
+        *curCost = fminf(cost, *curCost);
         return;
     }
 
@@ -231,11 +228,7 @@ mod = SourceModule("""
 
         float cost = abs((r_1*theta_1)) + abs((r_2*theta_2)) + sqrtf(powf(V2[0],2) + powf(V2[1],2));
 
-        if (cost> *curCost){
-            return;
-        }
-
-        *curCost = cost;
+        *curCost = fminf(cost, *curCost);
         return;
     }
 
@@ -329,11 +322,7 @@ mod = SourceModule("""
 
         float cost = abs((r_1*theta_1)) + abs((r_2*theta_2)) + sqrtf(powf(V2[0],2) + powf(V2[1],2));
 
-        if (cost> *curCost){
-            return;
-        }
-
-        *curCost = cost;
+        *curCost = fminf(cost, *curCost);
         return;
     }
 
@@ -426,11 +415,7 @@ mod = SourceModule("""
 
         float cost = abs((r_1*theta_1)) + abs((r_2*theta_2)) + sqrtf(powf(V2[0],2) + powf(V2[1],2));
 
-        if (cost > *curCost){
-            return;
-        }
-
-        *curCost = cost;
+        *curCost = fminf(cost, *curCost);
         return;
     }
 
@@ -446,7 +431,7 @@ mod = SourceModule("""
         curCost += parentCost;
         bool connected = curCost < cost;
 
-        cost = connected ? curCost : cost;
+        cost = fminf(curCost, cost);
         return connected;
     }
 
@@ -515,12 +500,11 @@ class GMT(object):
         self._cpu_init(init_parameters, debug)
         self._gpu_init(debug)
 
-        self.route = []
+        self.route = None
         self.start = 0
 
     def _cpu_init(self, init_parameters, debug):
         self.states = init_parameters['states']
-        # self.states[:,1] *= -1
         self.n = self.states.shape[0]
         self.waypoints = np.arange(self.n).astype(np.int32)
 
@@ -551,6 +535,9 @@ class GMT(object):
         self.Vunexplored[self.start] = 1
         self.Vopen[self.start] = 0
 
+        if self.start != iter_parameters['start'] and self.route is not None:
+            del self.route[-1]
+
         self.obstacles = iter_parameters['obstacles']
         self.num_obs = iter_parameters['num_obs']
         self.parent = np.full(self.n, -1).astype(np.int32)
@@ -560,6 +547,7 @@ class GMT(object):
         self.radius = iter_parameters['radius']
         self.threshold = np.array([ iter_parameters['threshold'] ]).astype(np.float32)
 
+        print(f"changed start: {self.start}")
 
         self.cost[self.start] = 0
         self.Vunexplored[self.start] = 0
@@ -592,12 +580,17 @@ class GMT(object):
         # del self.route[-1]
 
     def run_step(self, iter_parameters, iter_limit=1000, debug=False):
+        start_mem = timer()
         self.step_init(iter_parameters,debug)
+        end_mem = timer()
+
+        # print("memory time: ", end-start)    
 
         goal_reached = False
         iteration = 0
         threadsPerBlock = 128
         while True:
+            start_iter = timer()
             iteration += 1
 
             ########## create Wave front ###############
@@ -605,7 +598,7 @@ class GMT(object):
 
             nBlocksPerGrid = int(((self.n + threadsPerBlock - 1) / threadsPerBlock))
             wavefront(dev_Gindicator, self.dev_open, self.dev_cost, self.dev_threshold, self.dev_n, block=(threadsPerBlock,1,1), grid=(nBlocksPerGrid,1))
-            self.dev_threshold += self.dev_threshold
+            self.dev_threshold += 2*self.dev_radius
             goal_reached = dev_Gindicator[self.goal].get() == 1
             
             dev_Gscan = cuda.to_gpu(dev_Gindicator)
@@ -623,16 +616,17 @@ class GMT(object):
             compact(dev_y, dev_yscan, self.dev_open, self.dev_waypoints, self.dev_n, block=(threadsPerBlock,1,1), grid=(nBlocksPerGrid,1))
 
             if ySize == 0:
-                print('### empty open set ###')
+                print('### empty open set ###', iteration)
                 # del self.route[-1]
                 return self.route
             elif iteration >= iter_limit:
-                print('### iteration limit ###')
+                print('### iteration limit ###', iteration)
                 # del self.route[-1]
                 return self.route
             elif goal_reached:
                 print('### goal reached ### ', iteration)
                 self.parent = self.dev_parent.get()
+                self.route =[]
                 self.get_path()
                 return self.route
             elif gSize == 0:
@@ -663,6 +657,184 @@ class GMT(object):
             # # launch planning
             xBlocksPerGrid = int(((xSize + threadsPerBlock - 1) / threadsPerBlock))
             dubinConnection(self.dev_cost, self.dev_parent, dev_x, dev_y, self.dev_states, self.dev_open, self.dev_unexplored, dev_xSize, dev_ySize, self.dev_obstacles, self.dev_num_obs, self.dev_radius, block=(threadsPerBlock,1,1), grid=(xBlocksPerGrid,1))
+            end_iter = timer()
+
+            if debug:
+                print('dev parents:', self.dev_parent)
+                print('dev cost: ', self.dev_cost)
+                print('dev unexplored: ', self.dev_unexplored)
+                print('dev open: ', self.dev_open)
+                print('dev threshold: ', self.dev_threshold, self.dev_radius)
+
+                print('y size: ', ySize, 'y: ' , dev_y)
+                print('G size: ', gSize, 'G: ', dev_G)
+
+                print('x size: ', dev_xSize, 'x: ', dev_x)
+            iteration_time = end_iter-start_iter
+            print(f'######### iteration: {iteration} iteration time: {iteration_time}')
+
+class GMTasync(object):
+    def __init__(self, init_parameters, debug=False):
+        self.route = []
+        self.start = 0
+        self.stream1 = drv.Stream()
+        self.stream2 = drv.Stream()
+
+        self._cpu_init(init_parameters, debug)
+        self._gpu_init(debug)
+
+
+    def _cpu_init(self, init_parameters, debug):
+        self.states = init_parameters['states']
+        # self.states[:,1] *= -1
+        self.n = self.states.shape[0]
+        self.waypoints = np.arange(self.n).astype(np.int32)
+
+        self.neighbors = init_parameters['neighbors']
+        self.num_neighbors = init_parameters['num_neighbors']
+
+        self.cost = np.full(self.n, np.inf).astype(np.float32)
+        self.Vunexplored = np.full(self.n, 1).astype(np.int32)
+        self.Vopen = np.zeros_like(self.Vunexplored).astype(np.int32)
+        
+        if debug:
+            print('neighbors: ', self.neighbors)
+            print('number neighbors: ', self.num_neighbors)
+
+    def _gpu_init(self, debug):
+        self.dev_n = cuda.to_gpu_async(np.array([self.n]).astype(np.int32), stream=self.stream2)
+
+        self.neighbors_index = cuda.to_gpu_async(self.num_neighbors, stream=self.stream1)
+        exclusiveScan(self.neighbors_index, stream=self.stream1)
+
+        self.dev_num_neighbors = cuda.to_gpu_async(self.num_neighbors, stream=self.stream2)
+
+        self.dev_states = cuda.to_gpu_async(self.states, stream=self.stream2)
+        self.dev_waypoints = cuda.to_gpu_async(self.waypoints, stream=self.stream2)
+
+        self.dev_neighbors = cuda.to_gpu_async(self.neighbors, stream=self.stream2)
+
+        self.stream1.synchronize()
+        self.stream2.synchronize()
+
+
+    def step_init(self, iter_parameters, debug):
+        self.cost[self.start] = np.inf
+        self.Vunexplored[self.start] = 1
+        self.Vopen[self.start] = 0
+
+        self.obstacles = iter_parameters['obstacles']
+        self.num_obs = iter_parameters['num_obs']
+        self.parent = np.full(self.n, -1).astype(np.int32)
+
+        self.start = iter_parameters['start']
+        self.goal = iter_parameters['goal']
+        self.radius = iter_parameters['radius']
+        self.threshold = np.array([ iter_parameters['threshold'] ]).astype(np.float32)
+
+
+        self.cost[self.start] = 0
+        self.Vunexplored[self.start] = 0
+        self.Vopen[self.start] = 1
+
+        if debug:
+            print('parents:', self.parent)
+            print('cost: ', self.cost)
+            print('Vunexplored: ', self.Vunexplored)
+            print('Vopen: ', self.Vopen)
+
+        self.dev_open = cuda.to_gpu_async(self.Vopen, stream=self.stream2)
+
+        self.dev_threshold = cuda.to_gpu_async(self.threshold, stream=self.stream1)
+
+        self.dev_radius = cuda.to_gpu_async(np.array([self.radius]).astype(np.float32), stream=self.stream2)
+        self.dev_obstacles = cuda.to_gpu_async(self.obstacles, stream=self.stream2) 
+        self.dev_num_obs = cuda.to_gpu_async(self.num_obs, stream=self.stream2)
+
+        self.dev_parent = cuda.to_gpu_async(self.parent, stream=self.stream2)
+        self.dev_cost = cuda.to_gpu_async(self.cost, stream=self.stream1)
+        
+        self.dev_unexplored = cuda.to_gpu_async(self.Vunexplored, stream=self.stream1)
+
+    def get_path(self):
+        p = self.goal
+        while p != -1:
+            self.route.append(p)
+            p = self.parent[p]
+
+        # del self.route[-1]
+
+    def run_step(self, iter_parameters, iter_limit=1000, debug=False):
+        self.step_init(iter_parameters,debug)
+
+        goal_reached = False
+        iteration = 0
+        threadsPerBlock = 128
+        while True:
+            iteration += 1
+
+            ########## create Wave front ###############
+            dev_Gindicator = cuda.zeros_like(self.dev_open, dtype=np.int32)
+
+            nBlocksPerGrid = int(((self.n + threadsPerBlock - 1) / threadsPerBlock))
+            wavefront(dev_Gindicator, self.dev_open, self.dev_cost, self.dev_threshold, self.dev_n, block=(threadsPerBlock,1,1), grid=(nBlocksPerGrid,1), stream=self.stream1)
+            self.dev_threshold += self.dev_threshold
+            goal_reached = dev_Gindicator[self.goal].get() == 1
+            
+            dev_Gscan = cuda.to_gpu_async(dev_Gindicator, stream=self.stream1)
+            exclusiveScan(dev_Gscan, stream=self.stream1)
+            dev_gSize = dev_Gscan[-1] + dev_Gindicator[-1]
+            gSize = int(dev_gSize.get_async(stream=self.stream1))
+
+            if iteration >= iter_limit:
+                print('### iteration limit ###')
+                # del self.route[-1]
+                return self.route
+            elif goal_reached:
+                print('### goal reached ### ', iteration)
+                self.parent = self.dev_parent.get_async(stream=self.stream1)
+                self.get_path()
+                return self.route
+            elif gSize == 0:
+                print('### threshold skip ', iteration)
+                continue
+
+            dev_G = cuda.zeros(gSize, dtype=np.int32)
+            compact(dev_G, dev_Gscan, dev_Gindicator, self.dev_waypoints, self.dev_n, block=(threadsPerBlock,1,1), grid=(nBlocksPerGrid,1), stream=self.stream1)    
+
+            ########## creating neighbors of wave front to connect open ###############
+            dev_xindicator = cuda.zeros_like(self.dev_open, dtype=np.int32)
+            gBlocksPerGrid = int(((gSize + threadsPerBlock - 1) / threadsPerBlock))
+            neighborIndicator(dev_xindicator, dev_G, self.dev_unexplored, self.dev_neighbors, self.dev_num_neighbors, self.neighbors_index, dev_gSize, block=(threadsPerBlock,1,1), grid=(gBlocksPerGrid,1), stream=self.stream1)
+
+            dev_xscan = cuda.to_gpu_async(dev_xindicator, stream=self.stream1)
+            exclusiveScan(dev_xscan, stream=self.stream1)
+            dev_xSize = dev_xscan[-1] + dev_xindicator[-1]
+            xSize = int(dev_xSize.get_async(stream=self.stream1))
+
+            if xSize == 0:
+                print('### x skip')
+                continue
+
+            dev_x = cuda.zeros(xSize, dtype=np.int32)
+            compact(dev_x, dev_xscan, dev_xindicator, self.dev_waypoints, self.dev_n, block=(threadsPerBlock,1,1), grid=(nBlocksPerGrid,1), stream=self.stream1)
+
+            ######### scan and compact open set to connect neighbors ###############
+            dev_yscan = cuda.to_gpu_async(self.dev_open, stream=self.stream2)
+            exclusiveScan(dev_yscan, stream=self.stream2)
+            dev_ySize = dev_yscan[-1] + self.dev_open[-1]
+            ySize = int(dev_ySize.get_async(stream=self.stream2))
+
+            dev_y = cuda.zeros(ySize, dtype=np.int32)
+            compact(dev_y, dev_yscan, self.dev_open, self.dev_waypoints, self.dev_n, block=(threadsPerBlock,1,1), grid=(nBlocksPerGrid,1), stream=self.stream2)
+
+            # self.stream1.synchronize()
+            self.stream2.synchronize()
+
+            ######### connect neighbors ####################
+            # # launch planning
+            xBlocksPerGrid = int(((xSize + threadsPerBlock - 1) / threadsPerBlock))
+            dubinConnection(self.dev_cost, self.dev_parent, dev_x, dev_y, self.dev_states, self.dev_open, self.dev_unexplored, dev_xSize, dev_ySize, self.dev_obstacles, self.dev_num_obs, self.dev_radius, block=(threadsPerBlock,1,1), grid=(xBlocksPerGrid,1), stream=self.stream1)
 
             if debug:
                 print('dev parents:', self.dev_parent)
@@ -712,9 +884,7 @@ def unitTest1():
     init_parameters = {'states':states, 'neighbors':neighbors, 'num_neighbors':num_neighbors}
     iter_parameters = {'start':start, 'goal':goal, 'radius':radius, 'threshold':threshold, 'obstacles':obstacles, 'num_obs':num_obs}
 
-    gmt = GMT(init_parameters, debug=True)
-    route = gmt.run_step(iter_parameters, iter_limit=8, debug=True)
-    return route[::-1], states, obstacles
+    return init_parameters, iter_parameters
 
 
 def unitTest2():
@@ -749,9 +919,7 @@ def unitTest2():
     init_parameters = {'states':states, 'neighbors':neighbors, 'num_neighbors':num_neighbors}
     iter_parameters = {'start':start, 'goal':goal, 'radius':radius, 'threshold':threshold, 'obstacles':obstacles, 'num_obs':num_obs}
 
-    gmt = GMT(init_parameters, debug=True)
-    route = gmt.run_step(iter_parameters, iter_limit=20, debug=True)
-    return route[::-1], states, obstacles
+    return init_parameters, iter_parameters
 
 def unitTest3():
     states = np.array([[0,0,135*np.pi/180], [0,0,90*np.pi/180], [0,0,45*np.pi/180], # 0-2
@@ -785,19 +953,23 @@ def unitTest3():
     init_parameters = {'states':states, 'neighbors':neighbors, 'num_neighbors':num_neighbors}
     iter_parameters = {'start':start, 'goal':goal, 'radius':radius, 'threshold':threshold, 'obstacles':obstacles, 'num_obs':num_obs}
 
-    gmt = GMT(init_parameters, debug=True)
-    route = gmt.run_step(iter_parameters, iter_limit=20, debug=True)
-    return route[::-1], states, obstacles
+    return init_parameters, iter_parameters
 
 if __name__ == '__main__':
-    route, states, obstacles = unitTest1()
-    print(route)
-    print(states[route,:])
+    init_parameters, iter_parameters = unitTest2()
 
-    left = -2
-    right = 6
-    up = 6
-    down = -2
+    # gmt = GMT(init_parameters, debug=True)
+    gmt = GMTasync(init_parameters, debug=True)
+
+    start = timer()
+    route = gmt.run_step(iter_parameters, iter_limit=20, debug=True)
+    end = timer()
+
+    route = route[::-1]
+    states = init_parameters['states']
+
+    print("elapsed time: ", end-start)    
+    print(f"route indices: {route},\n route states: {states[route,:]}")
 
     x = states[:,0]
     y = states[:,1]
@@ -814,12 +986,9 @@ if __name__ == '__main__':
     fig, ax = plt.subplots(nrows=2, ncols=1)
     ax[0].quiver(x,y,u,v)
     ax[0].set_title('States')
-    # ax[0].set_xlim(left, right)
-    # ax[0].set_ylim(up, down)
+
     ax[1].quiver(x_r,y_r,u_r,v_r)
     ax[1].set_title('Route')
-    # ax[1].set_xlim(left, right)
-    # ax[1].set_ylim(up, down)
     # Create a Rectangle patch
     # rect = patches.Rectangle((6,4),3,3,linewidth=1,edgecolor='r',facecolor='none')
     # rect2 = patches.Rectangle((6,4),3,3,linewidth=1,edgecolor='r',facecolor='none')
@@ -830,10 +999,5 @@ if __name__ == '__main__':
 
     for a in ax.flat:
         a.set(xlabel='x', ylabel='y')
-
-
-    # # Hide x labels and tick labels for top plots and y ticks for right plots.
-    # for a in ax.flat:
-    #     a.label_outer()
 
     plt.show()

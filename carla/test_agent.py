@@ -105,6 +105,8 @@ class TestAgent(Agent):
                         else:
                             ni.append(j*(num_yaw-1) + k)
                         num += 1
+                        if wj == start or wj == goal:
+                            break
 
             # add in number of yaw orientations to waypoint list        
             ri = wi.rotation
@@ -121,20 +123,23 @@ class TestAgent(Agent):
                 elif theta <= -180:
                     theta = 360 - theta
                 states.append([li.x, li.y, theta*np.pi/180])
+                if wi == start or wi == goal:
+                    break
 
         self.states = np.array(states).astype(np.float32)
         self.neighbors = np.array(neighbors).astype(np.int32)
         self.num_neighbors = np.array(num_neighbors).astype(np.int32)
 
         init_parameters = {'states':self.states, 'neighbors':self.neighbors, 'num_neighbors':self.num_neighbors}
-        self.start = self.states.shape[0] -1*(num_yaw-1)
-        self.goal = self.states.shape[0] - 2*(num_yaw-1)
+        self.start = self.states.shape[0] - 1
+        self.goal = self.states.shape[0] - 2
 
         print(f'start: {self.start} goal: {self.goal} total states: {self.states.shape[0]}')
         print(f'start location: {self.states[self.start]}, goal location: {self.states[self.goal]}')
-        # print('neighbors: ', self.states[self.neighbors[-self.num_neighbors[self.start]:]])
     
-        self.gmt_planner = GMT(init_parameters, debug=True)
+        self.gmt_planner = GMT(init_parameters, debug=False)
+        # self.gmt_planner = GMTmem(init_parameters, debug=False)
+        # self.gmt_planner = GMTstream(init_parameters, debug=False)
 
     @staticmethod
     def _create_bb_points(vehicle):
@@ -190,10 +195,7 @@ class TestAgent(Agent):
         from start_waypoint to end_waypoint
         """
         self.radius = 2
-        self.threshold  = 2
-
-        # self.obstacles = np.array([[-1,-1,-1,-1]]).astype(np.float32)
-        # self.num_obs = self.num_obs = np.array([0]).astype(np.int32)
+        self.threshold  = 0.05
 
         obstacles = []
         for vehicle in self._world.get_actors().filter('vehicle.*'):
@@ -207,10 +209,6 @@ class TestAgent(Agent):
                 my_global_points = TestAgent._vehicle_to_world(my_bb_points, self._vehicle)
 
                 my_global_points /= my_global_points[3,:]
-                # transform = vehicle.get_transform()
-                # bounding_box = vehicle.bounding_box
-                # bounding_box.location += transform.location
-                # my_location = self.current_location.location
                 dist = np.sqrt((my_global_points[0,2]-global_points[0,2])**2 + (my_global_points[1,2]-global_points[1,2])**2 + (my_global_points[2,2]-global_points[2,2])**2)
 
                 if 0<dist:
@@ -228,13 +226,11 @@ class TestAgent(Agent):
 
         iter_parameters = {'start':self.start, 'goal':self.goal, 'radius':self.radius, 'threshold':self.threshold, 'obstacles':self.obstacles, 'num_obs':self.num_obs}
         
+        start_timer = timer()
         route = self.gmt_planner.run_step(iter_parameters, iter_limit=1000, debug=debug)
+        end_timer = timer()
 
-        # if debug:
-        #print('route: ', route)
-        # del route[-1]
-
-        print('waypoint: ', self.states[route[::-1]])
+        print("elapsed time: ", end_timer-start_timer)    
 
         trace_route = []
         for r in route:
