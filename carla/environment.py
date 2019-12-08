@@ -6,6 +6,9 @@
 # This work is licensed under the terms of the MIT license.
 # For a copy, see <https://opensource.org/licenses/MIT>.
 
+
+
+
 import glob
 import os
 import sys
@@ -25,6 +28,7 @@ import weakref
 
 import numpy as np
 import cv2
+from cv2 import VideoWriter, VideoWriter_fourcc
 from collections import defaultdict
 
 import carla
@@ -154,7 +158,7 @@ class Car(object):
 
 class Camera(object):
 
-    def __init__(self, sensor_bp, transform, parent_actor, agent):
+    def __init__(self, sensor_bp, transform, parent_actor, agent,record = False):
         self.vehicle = parent_actor
         self.camera_transform = transform
         self.world = self.vehicle.world
@@ -173,7 +177,15 @@ class Camera(object):
         self.world.actor_list.append(self.sensor) # add to actor_list of world so we can clean up later
 
         weak_self = weakref.ref(self)
-        # self.sensor.listen(lambda image: Camera.callback(weak_self,image))
+
+
+        ### Recording stuff:
+
+        if record:
+            
+            fourcc = VideoWriter_fourcc(*'MP42')
+            self.video_recorder = VideoWriter('./camera_view.avi', fourcc, float(30), (IM_WIDTH, IM_HEIGHT))
+            self.sensor.listen(lambda image: Camera.callback(weak_self,image))
 
     @staticmethod
     def callback(weak_self, data):
@@ -236,12 +248,10 @@ class Camera(object):
         image = image.reshape((IM_HEIGHT,IM_WIDTH,4))
         image = image[:,:,:3]
 
-        # print('IMG_'+str(imageData.frame_number)+'.png')
-        # cv2.imwrite('IMG_'+str(imageData.frame_number)+'.png', image)
+        image = image.astype(np.unit8)
 
-        #print(image.shape)
-        #cv2.imshow("Camera",image)
-        #cv2.waitKey(1)
+        self.video_recorder.write(image)
+
 
     @staticmethod
     def process_segment(weak_self,segmentData):
