@@ -67,7 +67,47 @@ Our testing environment for this project is [CARLA driving simulator](http://car
 
 ### Build:
 
-To be able to run our code, ...
+To be able to run our code you need the following dependencies:
+
+**Dependencies:**
+
+* Python 3.7 (install Anaconda if you are new to python)
+* Anaconda
+* CARLA 0.9.5 (Tested on Windows Version)
+* PyCuda 2019.1.2
+* NumPy
+* pygame 1.9.6
+* Pandas
+* opencv-python
+* networkx
+* timeit
+
+
+To **run our code** follow the following instructions:
+
+1. Download and unzip the compiled version of CARLA 0.9.5 from [Here](https://github.com/carla-simulator/carla/releases)
+
+2. Make sure all of the dependencies mentioned above are installed
+
+3. Go to where you unzipped CARLA and run the following command in windows cmd (This initializes CARLA server that you can then connect to using python):
+
+  ```
+  CarlaUE4.exe -carla-server -benchmark -fps=15 -windowed -ResX=800 -ResY=600  
+  ```
+  
+4. Clone this repository into your desired path
+
+6. Start Anaconda Prompt and go to "carla" folder in your clonned repository
+
+7. Run the following command in Anaconda Prompt
+
+  ```
+  py -3.7 run.py
+  ```
+  
+  
+
+### Results:
 
 ## GMT* Algorithm:
 
@@ -148,8 +188,6 @@ Unit Test 1 | Unit Test 2 | Unit Test 3
 ![](images/unitTest1.png)| ![](images/unitTest2.png)| ![](images/unitTest3.png) 
 
 ## Performance Analysis:
-
-### Results:
 
 ![](images/time_plot_everything.png)
 
