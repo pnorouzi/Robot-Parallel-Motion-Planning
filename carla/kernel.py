@@ -423,10 +423,8 @@ mod = SourceModule("""
         LSRcost(&curCost, start_point, end_point, r_min, obstacles, num_obs);
         RSLcost(&curCost, start_point, end_point, r_min, obstacles, num_obs);
 
-        bool connected = false;
-
         curCost += parentCost;
-        connected = curCost < cost;
+        bool connected = curCost < cost;
 
         cost = fminf(curCost, cost);
         return connected;
@@ -483,5 +481,13 @@ mod = SourceModule("""
         if(indicator[index] == 1){
             x[scan[index]] = waypoints[index];
         }
+    }
+
+    __global__ void growThreshold(float *threshold, float *amount){
+        const int index = threadIdx.x + (blockIdx.x * blockDim.x);
+        if(index >= 1){
+            return;
+        }
+        threshold[0] = threshold[0] + 2.0*amount[0];
     }
 """)

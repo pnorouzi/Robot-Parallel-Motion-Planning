@@ -21,6 +21,7 @@ import math
 import numpy as np
 import networkx as nx
 from timeit import default_timer as timer
+import pandas as pd
 
 import carla
 from agents.tools.misc import *
@@ -58,7 +59,7 @@ class TestAgent(Agent):
         self._world = self._vehicle.get_world()
         self._map = self._vehicle.get_world().get_map()
 
-    def set_destination(self, start_waypoint, end_waypoint):
+    def set_destination(self, start_waypoint, end_waypoint, time=False):
         """
         This method creates a list of waypoints from agent's position to destination location
         based on the route returned by the global router
@@ -66,7 +67,7 @@ class TestAgent(Agent):
 
         self.create_samples(start_waypoint, end_waypoint)
 
-        route_trace = self._trace_route()
+        route_trace = self._trace_route(time=time)
         assert route_trace
 
         self._local_planner.set_global_plan(route_trace)
@@ -130,7 +131,7 @@ class TestAgent(Agent):
         self.neighbors = np.array(neighbors).astype(np.int32)
         self.num_neighbors = np.array(num_neighbors).astype(np.int32)
 
-        init_parameters = {'states':self.states, 'neighbors':self.neighbors, 'num_neighbors':self.num_neighbors}
+        init_parameters = {'states':self.states, 'neighbors':self.neighbors, 'num_neighbors':self.num_neighbors, 'threadsPerBlock':128}
         self.start = self.states.shape[0] - 1
         self.goal = self.states.shape[0] - 2
 
@@ -140,6 +141,7 @@ class TestAgent(Agent):
         self.gmt_planner = GMT(init_parameters, debug=False)
         # self.gmt_planner = GMTmem(init_parameters, debug=False)
         # self.gmt_planner = GMTstream(init_parameters, debug=False)
+        # self.gmt_planner = GMTmemStream(init_parameters, debug=False)
 
     @staticmethod
     def _create_bb_points(vehicle):
@@ -189,13 +191,13 @@ class TestAgent(Agent):
         matrix[2, 2] = c_p * c_r
         return matrix
 
-    def _trace_route(self, debug=False):
+    def _trace_route(self, debug=False, time=False):
         """
         This method sets up a global router and returns the optimal route
         from start_waypoint to end_waypoint
         """
         self.radius = 2
-        self.threshold  = 0.05
+        self.threshold  = 1
 
         obstacles = []
         for vehicle in self._world.get_actors().filter('vehicle.*'):
@@ -227,16 +229,19 @@ class TestAgent(Agent):
         iter_parameters = {'start':self.start, 'goal':self.goal, 'radius':self.radius, 'threshold':self.threshold, 'obstacles':self.obstacles, 'num_obs':self.num_obs}
         
         start_timer = timer()
-        route = self.gmt_planner.run_step(iter_parameters, iter_limit=1000, debug=debug)
+        route = self.gmt_planner.run_step(iter_parameters, iter_limit=1000, debug=debug, time=time)
         end_timer = timer()
-
         print("elapsed time: ", end_timer-start_timer)    
 
-        trace_route = []
-        for r in route:
-            wp = carla.Transform(carla.Location(self.states[r][0].item(), self.states[r][1].item(), 1.2), carla.Rotation(roll=0,pitch=0, yaw=(self.states[r][2]*180/np.pi).item()))
-            trace_route.append(wp)
-        draw_route(self._vehicle.get_world(), trace_route)
+        if time:
+            self.time_df = pd.DataFrame(self.gmt_planner.time_data)
+        
+
+        # trace_route = []
+        # for r in route:
+        #     wp = carla.Transform(carla.Location(self.states[r][0].item(), self.states[r][1].item(), 1.2), carla.Rotation(roll=0,pitch=0, yaw=(self.states[r][2]*180/np.pi).item()))
+        #     trace_route.append(wp)
+        # draw_route(self._vehicle.get_world(), trace_route)
 
         index = len(route)-1
         trace_route = []
@@ -247,7 +252,7 @@ class TestAgent(Agent):
 
         return trace_route
 
-    def run_step(self, debug=False):
+    def run_step(self, debug=True):
         """
         Execute one step of navigation.
         :return: carla.VehicleControl
@@ -274,8 +279,8 @@ class TestAgent(Agent):
             hazard_detected = True
 
         # check for the state of the traffic lights
-        light_state, traffic_light = False, None # 
-        # light_state, traffic_light = self._is_light_red(lights_list)
+        # light_state, traffic_light = False, None # 
+        light_state, traffic_light = self._is_light_red(lights_list)
         if light_state:
             if debug:
                 print('=== RED LIGHT AHEAD [{}])'.format(traffic_light.id))

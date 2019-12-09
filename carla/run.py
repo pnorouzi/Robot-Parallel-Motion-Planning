@@ -23,6 +23,9 @@ import numpy as np
 import random
 import time
 import threading
+from timeit import default_timer as timer
+import pandas as pd
+import matplotlib.pyplot as plt
 
 import carla
 from agents.navigation.basic_agent import BasicAgent
@@ -33,10 +36,13 @@ from environment import *
 
 SYNC = False
 DEBUG = False
-NUM_OBSTACLES = 0
+RECORD = True
+TIME = False
+NUM_OBSTACLES = 75
 SPAWN_POINT_INDICES = [116,198]
 AGENT = 'cuda'
 
+np.random.seed(18)
 
 
 def game_loop(options_dict):
@@ -59,13 +65,13 @@ def game_loop(options_dict):
         # spawn vehicle
         vehicle_bp = 'model3'
         vehicle_transform = spawn_points[options_dict['spawn_point_indices'][0]]
-        vehicle_transform.location.x -= 6
+        # vehicle_transform.location.x -= 6
         vehicle = Car(vehicle_bp, vehicle_transform, world)
 
         # # add obstacles and get sample nodes
         # world.block_road()
         # world.swerve_obstacles()
-        # world.random_obstacles(options_dict['num_obstacles'])
+        world.random_obstacles(options_dict['num_obstacles'])
 
         # wait for vehicle to land on ground
         world_snapshot = None
@@ -90,8 +96,28 @@ def game_loop(options_dict):
             agent = CudaAgent(vehicle.vehicle)
             agent.set_destination(vehicle_transform, destination_transform)
         elif options_dict['agent'] == 'test':
+            time = options_dict['time']
             agent = TestAgent(vehicle.vehicle)
-            agent.set_destination(vehicle_transform, destination_transform)
+            agent.set_destination(vehicle_transform, destination_transform, time=time)
+
+            if time:
+                df = agent.time_df
+
+                ax = plt.gca()
+
+                # df.plot(kind='line',x='iteration',y='elapsed', color='red', ax=ax)
+                df.plot(kind='line',x='iteration',y='wavefront',ax=ax)
+                df.plot(kind='line',x='iteration',y='wavefront_compact',ax=ax)
+                df.plot(kind='line',x='iteration',y='open_compact',ax=ax)
+                df.plot(kind='line',x='iteration',y='neighbors',ax=ax)
+                df.plot(kind='line',x='iteration',y='neighbors_compact',ax=ax)
+                df.plot(kind='line',x='iteration',y='connection',ax=ax)
+
+                plt.xlabel('iteration')
+                plt.ylabel('time (s)')
+               
+
+                plt.show()
         else:
             agent = BasicAgent(vehicle.vehicle)
             agent.set_destination((destination_transform.location.x, destination_transform.location.y, destination_transform.location.z))
@@ -102,16 +128,16 @@ def game_loop(options_dict):
 
         # depth = Camera(sensor_bp[2], sensor_transform, vehicle, agent)
         # segment= Camera(sensor_bp[1], sensor_transform, vehicle, agent)
-        #sensor_bp = ['sensor.camera.rgb', "sensor.camera.semantic_segmentation", "sensor.camera.depth"]
-        sensor_transform = carla.Transform(carla.Location(x= 2.5,z=2))
-
-        rgb_camera = Camera('sensor.camera.rgb', sensor_transform, vehicle, agent,record = True)
+        if options_dict['record']:
+            sensor_transform = carla.Transform(carla.Location(x= 0.5,z=2))
+            rgb_camera = Camera('sensor.camera.rgb', sensor_transform, vehicle, agent,record = True)
 
         # run the simulation
         print('Starting the simulation.')
         prev_location = vehicle.vehicle.get_location()
         sp = 2
         while True:
+
             # wait for server to be ready
             world.world.tick()
             world_snapshot = world.world.wait_for_tick(10.0)
@@ -134,7 +160,8 @@ def game_loop(options_dict):
                 print('distance from destination: ', current_location.distance(destination_transform.location))
                 # if out of destinations break else go to next destination
                 if len(options_dict['spawn_point_indices']) <= sp:
-                    rgb_camera.video_recorder.release()
+                    if options_dict['record']:
+                        rgb_camera.video_recorder.release()
                     break
                 else:
                     destination_transform.location = spawn_points[options_dict['spawn_point_indices'][sp]].location
@@ -164,6 +191,8 @@ if __name__ == '__main__':
         'spawn_point_indices': SPAWN_POINT_INDICES,
         'num_obstacles': NUM_OBSTACLES,
         'debug': DEBUG,
-        'sync': SYNC
+        'sync': SYNC,
+        'record': RECORD,
+        'time':TIME
     }
     game_loop(options_dict)
