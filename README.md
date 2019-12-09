@@ -80,7 +80,7 @@ To be able to run our code, ...
 
 In this section we go through our implementation that allows our virtual [Tesla Model 3](https://twitter.com/elonmusk?ref_src=twsrc%5Egoogle%7Ctwcamp%5Eserp%7Ctwgr%5Eauthor) drive around the city so smoothly!
 
-## Enviroments:
+### Enviroments:
 
 There are 3 different subsystems/environments that work with each other enabling our autonomous car to perform its tasks. CARLA, as the simulator, gives us the actual environment, obstacles, physics rules, etc. [PyCuda](https://documen.tician.de/pycuda/) (that is a Cuda wrapper for Python), on the other hand, deals with all the operations that need to be done in the GPU. Python is the binding environment between CARLA and PyCuda. Python gets environment information from CARLA and transfers it appropriately to PyCuda for GPU operations. After Path calculation on the GPU, python transfers the path to CARLA to be executed in the environment. You can see the three systems' interactions in the figure below:
 
@@ -88,24 +88,26 @@ There are 3 different subsystems/environments that work with each other enabling
   <img src="images/enviroment.png">
 </p>
 
-
 ### Pipeline:
 
 <p align="center">
   <img src="images/pipeline.png">
 </p>
 
-
-
+You can see the overall pipeline of our code implementation. This pipeline is a generic pipeline for many self-driving robotic applications. We implemented the whole pipeline using the three environments explained above. The red rectangle indicates the main part of our implementation in which we created from the ground up using the three environments (This is where we implement GMT* on the GPU). The rest of the pipeline was implemented so that we have the proper follow of information but we used CARLA for gathering the required information. The information was gathered in a way though to simulate an actual flow of information in a real self-driving environment. For example, in the sensors section, we did not create our sensor configuration but rather used the simulator (CARLA) for the gathering of important obstacle information (such as their location in the map). The information was quired in a way to simulate the location of the obstacles only when we get to 30 meters approximately of them (just like how real sensor configuration would behave). 
 
 
 ### State Space Samples
+
+To be able to plan in an continous space
 
 CARALA state samples | Up sample orientation 
 :-------------------------:|:-------------------------:
 ![](images/carlaStateSample.png)| ![](images/upSampleStates.gif)
 
 ### Dubin's Model
+
+A 4-wheel vehcile is a non-holomonic 
 
 Dubin's Model | Example 
 :-------------------------:|:-------------------------:
@@ -121,6 +123,8 @@ Unit Test 1 | Unit Test 2 | Unit Test 3
 ![](images/unitTest1.png)| ![](images/unitTest2.png)| ![](images/unitTest3.png) 
 
 ## Performance Analysis:
+
+### Results:
 
 ### Bloopers:
 
