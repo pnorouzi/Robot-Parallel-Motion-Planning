@@ -73,6 +73,13 @@ To be able to run our code, ...
 
 ### Sampling Based Motion Planning
 
+!GMT* works by taking sampled states and performing approximate [dynamic programming](https://en.wikipedia.org/wiki/Dynamic_programming) to grow a tree of near-optimal paths. 
+
+To perform this algorithm we maintain 6 buffers: open set, wavefront set, unexplored set, unexplored neighbor set, accumulated cost, and parent. 
+The open set is every node that is a leaf in the tree, the wavefront set are the nodes that are in the open set and the accumulated cost is below a threshold in which we will expand those nodes. For every node in the wavefront, the neighbors that have not been explored are added to the unexplored neighbor set which will be evaluated to add to the tree. The unexplored set marks which nodes have not been seen. The accumulated cost set tracks the cost to travel to a certain node all initialized to infinity and the parent buffer tracks the structure of the tree which is initialized to -1. In the first iteration, the start node is added to the open set, closed from the unexplored set, and the cost set to 0.
+
+In each iteration the neighbors of every node in the wavefront are added to the unexplored neighbor set if it has not been seen. The unexplored neighbor set is then connected to the nodes in the open set where the most locally optimal connection is kept and indicated in the parent buffer and the accumulated cost of the unexplored neighbor updated to be the parent node plus the cost of connection. The nodes are taken off the unexplored neighbor set and added to the open set. This is repeated until the goal ends up in the wavefront.
+ 
 ![](images/gmtExample1.gif)
 
 
@@ -144,7 +151,19 @@ Unit Test 1 | Unit Test 2 | Unit Test 3
 
 ### Results:
 
+![](images/time_plot_everything.png)
+
+In the plot above, the red top line shows the total time per iteration and right below it is the kernel to find the wavefront which clearly is what is consuming most of the run time. This part of the algorithm launches a thread for each state and checks if its in the open set (ready to be expanded) and if the cost is below the current threshold set an indicator that it should be included in the wavefront. Next, the threshold has to be increased for the next iteration and we need to check to see if the goal made it into the wavefront.
+
+After further digging into the section of the algorithm, increasing the cost threshold and checking to see if the goal is in the wavefront consume all the time and setting the indication is the fastest part of the code. The figure below shows the 2 simple but costly sections excluded from the timing and everything runs below 4ms per iteration.
+
+![](images/time_plot_excludeGoalcheck.png) 
+
 ### Optimization and Future work:
+
+Moving forward a clever approach to increasing the cost threshold and checking if the goal has been found needs to be tackled so that the algorithm can run in the requested 100 Hz time frame and be used for real time planning. 
+
+Also to make the autonomous vehicle complete perception and state estimation need to be implemented to avoid obstacles and come off of the imformation queried from CARLA. Most of the foundation work for this was completed, but not fully implemented as the focus was to complete a parallel motion planning algorithm. Furthermore, to be used in real life prediction will be needed to estimate the states of other agents in the environment and help for planning around the other agents. Lastly, a default PID control from CARLA was used to control throttle and steering angle to get to the waypoints the planner returned. There are several approaches to improve the controller, one is to tune the current PID better as it definitely has some room for improvent, retrieve the inputs from the Dubin's path, or implement an advanced optimization based controller.
 
 ### Bloopers:
 
