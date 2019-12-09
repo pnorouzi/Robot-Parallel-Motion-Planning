@@ -122,12 +122,14 @@ Now that we have our state-space discretized, we need to figure out a way to eva
 
 
 
-### Collison Check:
+### Collision Check:
 
+Using Dubins'paths to find the shortest path between two states would not be enough for our algorithm as it was intended. We need to be able to identify if any of the paths between two states collide with objects that lie in between them. We implemented a method that checks if any of the paths between two states collide with objects in our near surroundings (30 meters). If the path collides with any obstacle, we consider the path as invalid (we loop through the obstacles that are close to us in the GPU). After removing invalid paths we can find the lowest cost between two states by taking the shortest Dubins path between the remaining valid paths. The figure below shows the procedure in action (red box is the obstacle): 
 
-Dubin's Model | Example 
-:-------------------------:|:-------------------------:
-![](images/dubinsModel.png)| ![](images/dubinExample.gif)
+<p align="center">
+  <img src="images/dubinExample.gif">
+</p>
+
 
 ### Debugging/Unit Testing:
 
@@ -156,9 +158,11 @@ Unit Test 1 | Unit Test 2 | Unit Test 3
 
 ## Credits/Sources:
 
-FMT: https://arxiv.org/pdf/1306.3532.pdf
-GMT: https://arxiv.org/abs/1705.02403
-CARLA: http://carla.org/
-PyCuda: https://documen.tician.de/pycuda/
+* [FMT*](https://arxiv.org/pdf/1306.3532.pdf)
+* [GMT*](https://arxiv.org/abs/1705.02403)
+* [CARLA](http://carla.org/)
+* [PyCuda](https://documen.tician.de/pycuda/)
+* [DUBINS](https://gieseanw.files.wordpress.com/2012/10/dubins.pdf)
+
 
 
