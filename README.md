@@ -5,7 +5,8 @@ Robot Parallel Motion Planning
 
 * Peyman Norouzi: [LinkedIn](https://www.linkedin.com/in/peymannorouzi)
 
-* Klayton Wittler: [LinkedIn](https://www.linkedin.com/in/klayton-wittler)
+* Klayton Wittler: [LinkedIn](https://www.linkedin.com/in/klayton-wittler), [Website](https://klaywittler.github.io/)
+    * Tested on: Windows 10 Pro, i7-7700K @ 4.20GHz 16.0GB, GTX 1070 8.192GB
 
 Industrial road | Running from the cops 
 :-------------------------:|:-------------------------:
