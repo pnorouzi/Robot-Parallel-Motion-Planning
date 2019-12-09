@@ -99,7 +99,13 @@ You can see the overall pipeline of our code implementation. This pipeline is a 
 
 ### State Space Samples
 
-To be able to plan in an continous space
+Discretizing space is required when you are trying to plan your motion in a continuous space. We defined our state space to be in the following format:
+
+<p align="center">
+  <img src="http://bit.ly/36h0qbI">
+</p>
+
+Where X and Y are the locations with respect to CARLA's world coordinate system and θ is the yaw angle of the car (Car's orientation with respect to Z (height)). We queried, all of the possible location states from CARLA that lie in the streets where the car can move. The left image in the figure below shows the states that CARLA gives us. We designed state space points(waypoints) to be at least 4 meters apart since 4 gave us a good balance between performance and precision. Since CARLA only offers orientations that correspond with the flow of traffic on the corresponding side of the road, we had to add more 6 more directions for each given X and Y combination so that we would be able to deal with obstacles we face during our motion. We made sure not to have orientation opposite to the flow of traffic on each respective side of the road, making sure that after each maneuver around obstacles, our car doesn't continue driving on the wrong side of the road. You can see our final set up our state-space on the right animation in the figure below. 
 
 CARALA state samples | Up sample orientation 
 :-------------------------:|:-------------------------:
@@ -116,7 +122,12 @@ Dubin's Model | Example
 ### Collison Check:
 
 
+
+
 ### Debugging/Unit Testing:
+
+Since we are dealing with three environments for the completion of this project, there can be many opportunities in which our simulation might fail! But we knew simulation failure didn't necessarily mean that our Implementation of the GMT* algorithm is wrong! We also knew that it would be really hard to test for every test/edge cases using the full CARLA simulation, thus we had to come up with some clever Unit test so that we can check our GPU implementation frequently and efficiently! These tests saved us many many hours of unnecessary grief while debugging our code! You can see the three Unit tests all below (red box represent an obstacle): (top image is the state space and the bottom picture is the correct output path that our algorithm found)
+
 
 Unit Test 1 | Unit Test 2 | Unit Test 3 
 :-------------------------:|:-------------------------:|:-------------------------:
