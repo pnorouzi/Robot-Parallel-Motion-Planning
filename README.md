@@ -111,7 +111,9 @@ CARALA state samples | Up sample orientation
 :-------------------------:|:-------------------------:
 ![](images/carlaStateSample.png)| ![](images/upSampleStates.gif)
 
-### Dubin's Model
+### Dubin's Cost Model:
+
+Now that we have our state space deiscrtezed, we need to figure out a way to evaluate how costly it is to move between each  of the states. This way when we are 
 
 A 4-wheel vehcile is a non-holomonic 
 
@@ -137,7 +139,10 @@ Unit Test 1 | Unit Test 2 | Unit Test 3
 
 ### Results:
 
+### Optimization and Future work:
+
 ### Bloopers:
+
 
 ## Milestones:
 
