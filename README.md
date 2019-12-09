@@ -83,7 +83,7 @@ To be able to run our code you need the following dependencies:
 * timeit
 
 
-To **run our code** follow the following instructions:
+To **run our code** follow the following instructions (These instructions are for windows):
 
 1. Download and unzip the compiled version of CARLA 0.9.5 from [Here](https://github.com/carla-simulator/carla/releases)
 
@@ -97,7 +97,7 @@ To **run our code** follow the following instructions:
   
 4. Clone this repository into your desired path
 
-6. Start Anaconda Prompt and go to "carla" folder in your clonned repository
+6. Start Anaconda Prompt and go to "carla" folder in your cloned repository
 
 7. Run the following command in Anaconda Prompt
 
