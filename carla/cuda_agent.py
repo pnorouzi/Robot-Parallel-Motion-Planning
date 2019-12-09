@@ -27,7 +27,7 @@ class CudaAgent(Agent):
         self.obstacle_list = []
         self.plan = True
         self.done = False
-        self.waypoint = None
+        self.next_waypoint = None
         self.iteration_limit = 60
 
         self._dt = 1.0 / 20.0
@@ -37,9 +37,9 @@ class CudaAgent(Agent):
             'K_I': 1.4,
             'dt': self._dt}
         args_longitudinal_dict = {
-            'K_P': 1.0,
-            'K_D': 0,
-            'K_I': 1,
+            'K_P': 0.8,
+            'K_D': 0.001,
+            'K_I': 0.8,
             'dt': self._dt}
 
         self._vehicle_controller = VehiclePIDController(self._vehicle, args_lateral=args_lateral_dict, args_longitudinal=args_longitudinal_dict)
@@ -130,8 +130,8 @@ class CudaAgent(Agent):
         cords = np.zeros((3, 4))
         extent = vehicle.bounding_box.extent
 
-        cords[0, :] = np.array([extent.x + 2.2, extent.y + 2.2, extent.z, 1])
-        cords[1, :] = np.array([-extent.x - 2.2, -extent.y - 2.2, extent.z, 1])
+        cords[0, :] = np.array([extent.x + 2.5, extent.y + 2.5, extent.z, 1])
+        cords[1, :] = np.array([-extent.x - 2.5, -extent.y - 2.5, extent.z, 1])
         cords[2, :] = np.array([0, 0, 0, 1])    # center
 
         return cords
@@ -235,6 +235,17 @@ class CudaAgent(Agent):
 
         hazard_detected = False
 
+        light_state, traffic_light = self._is_light_red()
+        if light_state:
+            if debug:
+                print('=== RED LIGHT AHEAD [{}])'.format(traffic_light.id))
+
+            self._state = AgentState.BLOCKED_RED_LIGHT
+            hazard_detected = True
+
+        if hazard_detected:
+            return self.emergency_stop()
+
         if self.plan and not self.done:
             self.plan = False
             self.route = self._trace_route(debug) # get plan
@@ -245,7 +256,9 @@ class CudaAgent(Agent):
                     self.done = True
             else:
                 wp = self.route[-2]
-
+                if len(self.route) >= 4:
+                    self.next_waypoint = self._map.get_waypoint(carla.Location(self.states[self.route[-4]][0].item(), self.states[self.route[-4]][1].item(), self.current_location.location.z))
+            
             self.waypoint = self._map.get_waypoint(carla.Location(self.states[wp][0].item(), self.states[wp][1].item(), self.current_location.location.z))
         elif not self.done:
             self.update_start()
@@ -253,25 +266,14 @@ class CudaAgent(Agent):
         if self.done:
             return self.emergency_stop()
 
-        light_state, traffic_light = self._is_light_red()
-        if light_state:
-            if debug:
-                print('=== RED LIGHT AHEAD [{}])'.format(traffic_light.id))
+        control = self._vehicle_controller.run_step(self._target_speed, self.current_speed, self.waypoint, self.current_location) # execute first step of plan
 
-            self._state = AgentState.BLOCKED_RED_LIGHT
-            hazard_detected = True
-
-        if hazard_detected:
-            control = self.emergency_stop()
-        else:
-            control = self._vehicle_controller.run_step(self._target_speed, self.current_speed, self.waypoint, self.current_location) # execute first step of plan
-
-        if debug: # draw plan
-            trace_route = []
-            for r in self.route:
-                wp = carla.Transform(carla.Location(self.states[r][0].item(), self.states[r][1].item(), 1.2), carla.Rotation(roll=0,pitch=0, yaw=(self.states[r][2]*180/np.pi).item()))
-                trace_route.append(wp)
-            draw_route(self._vehicle.get_world(), trace_route)
+        # if debug: # draw plan
+        trace_route = []
+        for r in self.route:
+            wp = carla.Transform(carla.Location(self.states[r][0].item(), self.states[r][1].item(), 1.2), carla.Rotation(roll=0,pitch=0, yaw=(self.states[r][2]*180/np.pi).item()))
+            trace_route.append(wp)
+        draw_route(self._vehicle.get_world(), trace_route)
 
         return control
 
@@ -312,8 +314,8 @@ class CudaAgent(Agent):
             # It is too late. Do not block the intersection! Keep going!
             return (False, None)
 
-        if self.waypoint is not None:
-            if self.waypoint.is_intersection:
+        if self.next_waypoint is not None:
+            if self.next_waypoint.is_intersection:
                 min_angle = 180.0
                 sel_magnitude = 0.0
                 sel_traffic_light = None

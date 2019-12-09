@@ -36,11 +36,13 @@ from environment import *
 
 SYNC = False
 DEBUG = False
-RECORD = False
+RECORD = True
 TIME = False
-NUM_OBSTACLES = 15
+NUM_OBSTACLES = 75
 SPAWN_POINT_INDICES = [116,198]
-AGENT = 'test'
+AGENT = 'cuda'
+
+np.random.seed(18)
 
 
 def game_loop(options_dict):
@@ -69,7 +71,7 @@ def game_loop(options_dict):
         # # add obstacles and get sample nodes
         # world.block_road()
         # world.swerve_obstacles()
-        # world.random_obstacles(options_dict['num_obstacles'])
+        world.random_obstacles(options_dict['num_obstacles'])
 
         # wait for vehicle to land on ground
         world_snapshot = None

@@ -483,7 +483,7 @@ mod = SourceModule("""
         }
     }
 
-    __global__ void growThreshold(float *threshold, float *amount, const int *n){
+    __global__ void growThreshold(float *threshold, float *amount){
         const int index = threadIdx.x + (blockIdx.x * blockDim.x);
         if(index >= 1){
             return;

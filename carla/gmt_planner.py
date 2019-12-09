@@ -17,6 +17,7 @@ neighborIndicator = mod.get_function("neighborIndicator")
 exclusiveScan = ExclusiveScanKernel(np.int32, "a+b", 0)
 compact = mod.get_function("compact")
 dubinConnection = mod.get_function("dubinConnection")
+growThreshold = mod.get_function("growThreshold")
 
 class GMT(object):
     def __init__(self, init_parameters, debug=False):
@@ -74,6 +75,7 @@ class GMT(object):
         self.start = iter_parameters['start']
         self.goal = iter_parameters['goal']
         self.radius = iter_parameters['radius']
+        # self.threshold = np.full(self.n, iter_parameters['threshold']).astype(np.float32)
         self.threshold = np.array([ iter_parameters['threshold'] ]).astype(np.float32)
 
         self.cost[self.start] = 0
@@ -104,8 +106,6 @@ class GMT(object):
             self.route.append(p)
             p = self.parent[p]
 
-        # del self.route[-1]
-
     def run_step(self, iter_parameters, iter_limit=1000, debug=False, time=False):
         start_mem = timer() ############################# timer
         self.step_init(iter_parameters,debug)
@@ -116,13 +116,15 @@ class GMT(object):
         goal_reached = False
         iteration = 0
         while True:
+            iteration += 1
             start_iter = timer() ############################# timer
 
             ########## create Wave front ###############
             start_wave_f = timer() ############################# timer
             wavefront(self.dev_Gindicator, self.dev_open, self.dev_cost, self.dev_threshold, self.dev_n, block=(self.threadsPerBlock,1,1), grid=(self.nBlocksPerGrid,1))
 
-            self.dev_threshold += 2*self.dev_radius
+            # self.dev_threshold += 2*self.dev_radius
+            growThreshold(self.dev_threshold, self.dev_radius, block=(1,1,1), grid=(1,1))
             goal_reached = self.dev_Gindicator[self.goal].get() == 1
             end_wave_f = timer() ############################# timer
 
@@ -134,6 +136,10 @@ class GMT(object):
 
             if iteration >= iter_limit:
                 print('### iteration limit ###', iteration)
+                self.parent = self.dev_parent.get()
+                if self.parent[self.goal] != -1:
+                    self.route = []
+                    self.get_path()
                 return self.route
             elif goal_reached:
                 print('### goal reached ### ', iteration)
@@ -223,8 +229,6 @@ class GMT(object):
                 self.time_data["connection"].append(end_connect-start_connect)
                 self.time_data["elapsed"].append(end_iter-start_iter)
                 self.time_data["iteration"].append(iteration)
-
-            iteration += 1
 
 
 

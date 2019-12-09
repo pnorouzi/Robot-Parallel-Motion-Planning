@@ -31,7 +31,7 @@ def draw_waypoints(world, waypoints, z=0.2):
         end = begin + carla.Location(x=math.cos(angle), y=math.sin(angle))
         world.debug.draw_arrow(begin, end, arrow_size=0.3, life_time=1.0)
 
-def draw_route(world, waypoints, z=0.2):
+def draw_route(world, waypoints, z=-0.5):
     """
     Draw a list of waypoints at a certain height given in z.
 
