@@ -107,24 +107,27 @@ Discretizing space is required when you are trying to plan your motion in a cont
 
 Where X and Y are the locations with respect to CARLA's world coordinate system and θ is the yaw angle of the car (Car's orientation with respect to Z (height)). We queried, all of the possible location states from CARLA that lie in the streets where the car can move. The left image in the figure below shows the states that CARLA gives us. We designed state space points(waypoints) to be at least 4 meters apart since 4 gave us a good balance between performance and precision. Since CARLA only offers orientations that correspond with the flow of traffic on the corresponding side of the road, we had to add more 6 more directions for each given X and Y combination so that we would be able to deal with obstacles we face during our motion. We made sure not to have orientation opposite to the flow of traffic on each respective side of the road, making sure that after each maneuver around obstacles, our car doesn't continue driving on the wrong side of the road. You can see our final set up our state-space on the right animation in the figure below. 
 
+
 CARALA state samples | Up sample orientation 
 :-------------------------:|:-------------------------:
 ![](images/carlaStateSample.png)| ![](images/upSampleStates.gif)
 
 ### Dubin's Cost Model:
 
-Now that we have our state space deiscrtezed, we need to figure out a way to evaluate how costly it is to move between each  of the states. This way when we are 
+Now that we have our state-space discretized, we need to figure out a way to evaluate how costly it is to move between each of the states. This way when we are planning our motion between states, we can know costly each connection between states is going to be. This would allow us to choose the least costly path between our source and destination. A 4-wheel vehicle is a non-holonomic robot meaning that the car has constraints that are nonintegrable into positional constraints. A good easy to implement model of motion for our vehicle is Dubin's path. If we assume our vehicle to be a Dubin's car, we can easily find the shortest path between two states using only 3 controls: “turn left at maximum”, “turn right at maximum”, and “go straight”. The Dubin’s Car was introduced into the literature by Lester Dubins, a famous mathematician and statistician, in a paper published in 1957. Let’s name the controls: “turn right at maximum” will be R, “turn left at maximum” will be L, and “go straight” will be S. Then Dubins showed in his paper that the shortest path between two states is going to be one of the following paths: LSL, LSR, RSL, RSR, RLR, and LRL. We can find the cost between two states by finding the shortest length of travel out of the 6 offered paths. If you would like to know more about the topic check this [link out](https://gieseanw.files.wordpress.com/2012/10/dubins.pdf). Below you can see, 4 out of 6 (LSL, LSR, RSL, RSR) Dubin's path options (taken from [here](https://gieseanw.files.wordpress.com/2012/10/dubins.pdf)):
 
-A 4-wheel vehcile is a non-holomonic 
+<p align="center">
+  <img src="images/dubinsModel.png">
+</p>
 
-Dubin's Model | Example 
-:-------------------------:|:-------------------------:
-![](images/dubinsModel.png)| ![](images/dubinExample.gif)
+
 
 ### Collison Check:
 
 
-
+Dubin's Model | Example 
+:-------------------------:|:-------------------------:
+![](images/dubinsModel.png)| ![](images/dubinExample.gif)
 
 ### Debugging/Unit Testing:
 
