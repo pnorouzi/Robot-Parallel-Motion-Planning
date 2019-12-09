@@ -30,9 +30,9 @@ Industrial road | Running from the cops
   * [Debugging/Unit Testing](#debuggingunit-testing)
 - [Performance Analysis](#performance-analysis-)
   * [Optimization and Future work](#optimization-and-future-work)
-  * [Bloopers:](#bloopers)
-- [Milestones:](#milestones)
-- [Credits/Sources:](#creditssources)
+  * [Bloopers](#bloopers)
+- [Milestones](#milestones)
+- [Credits/Sources](#creditssources)
 
 
 ## Overview:
@@ -146,7 +146,7 @@ Here you can see some of our results in various scenarios: (In some cases we add
 
 ## GMT* Algorithm:
 
-### Sampling Based Motion Planning
+### Sampling Based Motion Planning:
 
 GMT* works by taking sampled states and performing approximate [dynamic programming](https://en.wikipedia.org/wiki/Dynamic_programming) to grow a tree of near-optimal paths. 
 
@@ -179,7 +179,7 @@ There are 3 different subsystems/environments that work with each other enabling
 You can see the overall pipeline of our code implementation. This pipeline is a generic pipeline for many self-driving robotic applications. We implemented the whole pipeline using the three environments explained above. The red rectangle indicates the main part of our implementation in which we created from the ground up using the three environments (This is where we implement GMT* on the GPU). The rest of the pipeline was implemented so that we have the proper follow of information but we used CARLA for gathering the required information. The information was gathered in a way though to simulate an actual flow of information in a real self-driving environment. For example, in the sensors section, we did not create our sensor configuration but rather used the simulator (CARLA) for the gathering of important obstacle information (such as their location in the map). The information was quired in a way to simulate the location of the obstacles only when we get to 30 meters approximately of them (just like how real sensor configuration would behave). 
 
 
-### State Space Samples
+### State Space Samples:
 
 Discretizing space is required when you are trying to plan your motion in a continuous space. We defined our state space to be in the following format:
 
