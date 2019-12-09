@@ -73,7 +73,7 @@ To be able to run our code, ...
 
 ### Sampling Based Motion Planning
 
-!GMT* works by taking sampled states and performing approximate [dynamic programming](https://en.wikipedia.org/wiki/Dynamic_programming) to grow a tree of near-optimal paths. 
+GMT* works by taking sampled states and performing approximate [dynamic programming](https://en.wikipedia.org/wiki/Dynamic_programming) to grow a tree of near-optimal paths. 
 
 To perform this algorithm we maintain 6 buffers: open set, wavefront set, unexplored set, unexplored neighbor set, accumulated cost, and parent. 
 The open set is every node that is a leaf in the tree, the wavefront set are the nodes that are in the open set and the accumulated cost is below a threshold in which we will expand those nodes. For every node in the wavefront, the neighbors that have not been explored are added to the unexplored neighbor set which will be evaluated to add to the tree. The unexplored set marks which nodes have not been seen. The accumulated cost set tracks the cost to travel to a certain node all initialized to infinity and the parent buffer tracks the structure of the tree which is initialized to -1. In the first iteration, the start node is added to the open set, closed from the unexplored set, and the cost set to 0.
