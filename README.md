@@ -105,7 +105,16 @@ To **run our code** follow the following instructions (These instructions are fo
   ```
   py -3.7 run.py
   ```
-  
+
+A ```game_loop(options_dict)``` function has been defined which can be called from another python script if you'd like. The parameters it currently takes are:
+
+* sync (boolean): enable serve-client sync with 0.05s fixed time step
+* debug (boolean): to print main calculation in each step
+* record (boolean): save run as a .avi file
+* time (boolean): to perform performance analys
+* num_obstacles (int): spawn X number of obstacle randomly
+* spawn_point_indices (list of ints): list of indices which correspond to indicies in the spawn point list from the CARLA map. 0th index start and all following will be the goals in order.
+* agent (string): currently support 3 agent 'basic' is CARLA's implementation, 'test' executes our GMT planner on the first iteration and follows that path, 'cuda' executes GMT every time step
 
 ### Results:
 
@@ -214,11 +223,11 @@ Unit Test 1 | Unit Test 2 | Unit Test 3
 
 ![](images/time_plot_everything.png)
 
-In the plot above, the blue top line shows the total elapsed time per iteration and right below it is the kernel to check if the goal has been found which is consuming  1.89s total, almost 90% most of the current 2.16s run time seen below in the pie chart.
+In the plot above, the blue top line shows the total elapsed time per iteration and right below it is the kernel to check if the goal has been found which is consuming  1.89s total, almost 90% of the current 2.16s run time seen below in the pie chart.
 
 ![](images/everything_pie.png)
 
-To see some of the performance of the other kernels the plot below exludes the goal kernel time, which all in total accounts for 0.25s of run time. If the goal kernel can be speed up to match at worst times of 4ms we could achieve a run time of about 0.3s which is not at control frequency run time but still very fast is a very big state space of over 50,000 states
+To see some of the performance of the other kernels the plot below exludes the goal kernel time, which all in total accounts for 0.25s of run time. If the goal kernel can be speed up to match at worst times of 4ms we could achieve a run time of about 0.3s which is not at control frequency run time but still very fast in a very big state space of over 50,000 states
 
 ![](images/time_plot_excludeGoalcheck.png) 
 
