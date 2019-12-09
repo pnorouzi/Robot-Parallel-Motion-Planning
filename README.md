@@ -224,19 +224,31 @@ Unit Test 1 | Unit Test 2 | Unit Test 3
 
 ## Performance Analysis:
 
-![](images/time_plot_everything.png)
+
+<p align="center">
+  <img src="images/time_plot_everything.png">
+</p>
+
 
 In the plot above, the blue top line shows the total elapsed time per iteration and right below it is the kernel to check if the goal has been found which is consuming  1.89s total, almost 90% of the current 2.16s run time seen below in the pie chart.
 
-![](images/everything_pie.png)
+<p align="center">
+  <img src="images/everything_pie.png">
+</p>
+
 
 To see some of the performance of the other kernels the plot below exludes the goal kernel time, which all in total accounts for 0.25s of run time. If the goal kernel can be speed up to match at worst times of 4ms we could achieve a run time of about 0.3s which is not at control frequency run time but still very fast in a very big state space of over 50,000 states
 
-![](images/time_plot_excludeGoalcheck.png) 
+<p align="center">
+  <img src="images/time_plot_excludeGoalcheck.png">
+</p>
 
 From the pie chart below it can be seen that most of the time is spent compacting arrays in order to launch more efficient kernels that do some of the planning computation. There is most likely some more room for improvement in structuring this problem to reduce compaction time. Streams were tried and found to have marginal effect, most likely to do the wash out of the goal kernel.
 
-![](images/excluded_pie.png)
+<p align="center">
+  <img src="images/excluded_pie.png">
+</p>
+
 
 ### Optimization and Future work:
 
