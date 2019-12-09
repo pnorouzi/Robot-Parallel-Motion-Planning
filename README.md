@@ -5,7 +5,8 @@ Robot Parallel Motion Planning
 
 * Peyman Norouzi: [LinkedIn](https://www.linkedin.com/in/peymannorouzi)
 
-* Klayton Wittler: [LinkedIn](https://www.linkedin.com/in/klayton-wittler)
+* Klayton Wittler: [LinkedIn](https://www.linkedin.com/in/klayton-wittler), [Website](https://klaywittler.github.io/)
+    * Tested on: Windows 10 Pro, i7-7700K @ 4.20GHz 16.0GB, GTX 1070 8.192GB
 
 Industrial road | Running from the cops 
 :-------------------------:|:-------------------------:
@@ -191,15 +192,21 @@ Unit Test 1 | Unit Test 2 | Unit Test 3
 
 ![](images/time_plot_everything.png)
 
-In the plot above, the red top line shows the total time per iteration and right below it is the kernel to find the wavefront which clearly is what is consuming most of the run time. This part of the algorithm launches a thread for each state and checks if its in the open set (ready to be expanded) and if the cost is below the current threshold set an indicator that it should be included in the wavefront. Next, the threshold has to be increased for the next iteration and we need to check to see if the goal made it into the wavefront.
+In the plot above, the blue top line shows the total elapsed time per iteration and right below it is the kernel to check if the goal has been found which is consuming  1.89s total, almost 90% most of the current 2.16s run time seen below in the pie chart.
 
-After further digging into the section of the algorithm, increasing the cost threshold and checking to see if the goal is in the wavefront consume all the time and setting the indication is the fastest part of the code. The figure below shows the 2 simple but costly sections excluded from the timing and everything runs below 4ms per iteration.
+![](images/everything_pie.png)
+
+To see some of the performance of the other kernels the plot below exludes the goal kernel time, which all in total accounts for 0.25s of run time. If the goal kernel can be speed up to match at worst times of 4ms we could achieve a run time of about 0.3s which is not at control frequency run time but still very fast is a very big state space of over 50,000 states
 
 ![](images/time_plot_excludeGoalcheck.png) 
 
+From the pie chart below it can be seen that most of the time is spent compacting arrays in order to launch more efficient kernels that do some of the planning computation. There is most likely some more room for improvement in structuring this problem to reduce compaction time. Streams were tried and found to have marginal effect, most likely to do the wash out of the goal kernel.
+
+![](images/excluded_pie.png)
+
 ### Optimization and Future work:
 
-Moving forward a clever approach to increasing the cost threshold and checking if the goal has been found needs to be tackled so that the algorithm can run in the requested 100 Hz time frame and be used for real time planning. 
+Moving forward a clever approach to checking if the goal has been found needs to be tackled so that the algorithm can run online and be used for real time planning. To achieve the desired 100 Hz control frequency, the compaction operations also need to be reduced. Further, CPU multi-threading can be used to control the GPU planning while other threads manage other parts of the code. 
 
 Also to make the autonomous vehicle complete perception and state estimation need to be implemented to avoid obstacles and come off of the imformation queried from CARLA. Most of the foundation work for this was completed, but not fully implemented as the focus was to complete a parallel motion planning algorithm. Furthermore, to be used in real life prediction will be needed to estimate the states of other agents in the environment and help for planning around the other agents. Lastly, a default PID control from CARLA was used to control throttle and steering angle to get to the waypoints the planner returned. There are several approaches to improve the controller, one is to tune the current PID better as it definitely has some room for improvent, retrieve the inputs from the Dubin's path, or implement an advanced optimization based controller.
 

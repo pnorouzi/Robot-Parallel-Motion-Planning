@@ -26,7 +26,7 @@ class GMT(object):
 
         self.route = []
         self.start = 0
-        self.time_data = {"wavefront":[], "wavefront_compact":[],"open_compact":[],"neighbors":[],"neighbors_compact":[],"connection":[],"elapsed":[],"iteration":[]}
+        self.time_data = {"wavefront":[], "wavefront_compact":[],"open_compact":[],"neighbors":[],"neighbors_compact":[],"connection":[],"elapsed":[],"threshold":[],"goal":[],"iteration":[]}
 
     def _cpu_init(self, init_parameters, debug):
         self.states = init_parameters['states']
@@ -122,11 +122,17 @@ class GMT(object):
             ########## create Wave front ###############
             start_wave_f = timer() ############################# timer
             wavefront(self.dev_Gindicator, self.dev_open, self.dev_cost, self.dev_threshold, self.dev_n, block=(self.threadsPerBlock,1,1), grid=(self.nBlocksPerGrid,1))
+            end_wave_f = timer() ############################# timer
 
+            start_threshold = timer() ############################# timer
             # self.dev_threshold += 2*self.dev_radius
             growThreshold(self.dev_threshold, self.dev_radius, block=(1,1,1), grid=(1,1))
+            end_threshold = timer() ############################# timer
+
+            start_goal = timer() ############################# timer
             goal_reached = self.dev_Gindicator[self.goal].get() == 1
-            end_wave_f = timer() ############################# timer
+            end_goal = timer() ############################# timer
+            
 
             start_wave_c = timer() ############################# timer
             dev_Gscan = cuda.to_gpu(self.dev_Gindicator)
@@ -228,6 +234,8 @@ class GMT(object):
                 self.time_data["neighbors_compact"].append(end_neighbor_c-start_neighbor_c)
                 self.time_data["connection"].append(end_connect-start_connect)
                 self.time_data["elapsed"].append(end_iter-start_iter)
+                self.time_data["threshold"].append(end_threshold-start_threshold)
+                self.time_data["goal"].append(end_goal-start_goal)
                 self.time_data["iteration"].append(iteration)
 
 
