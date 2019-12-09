@@ -106,9 +106,31 @@ To **run our code** follow the following instructions (These instructions are fo
   py -3.7 run.py
   ```
   
-  
 
 ### Results:
+
+Here you can see some of our results in various scenarios: (In some cases we added to the logic to wait for the red light and in some cases we allowed the car to not care about the red light on purpose)
+
+<p align="center">
+  <img src="images/perf_new.gif">
+</p>
+
+<p align="center">
+  <img src="images/perf_old.gif">
+</p>
+
+<p align="center">
+  <img src="images/redlight_new.gif">
+</p>
+
+<p align="center">
+  <img src="images/funny_new.gif">
+</p>
+
+<p align="center">
+  <img src="images/redlight_new2.gif">
+</p>
+
 
 ## GMT* Algorithm:
 
@@ -212,6 +234,11 @@ Also to make the autonomous vehicle complete perception and state estimation nee
 
 ### Bloopers:
 
+Here are some bloopers showing that everyone can and will make mistakes along the way lol :)
+
+<img src="images/blooper/booper1.gif" width="370"> <img src="images/blooper/haha.gif" width="380"> 
+
+<img src="images/blooper/fellInto_earth_car.png" width="380"> <img src="images/blooper/rePlan_crash.png" width="380"> 
 
 ## Milestones:
 
