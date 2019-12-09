@@ -258,7 +258,7 @@ Also to make the autonomous vehicle complete perception and state estimation nee
 
 ### Bloopers:
 
-Here are some bloopers showing that everyone can and will make mistakes along the way lol :)
+Here are some bloopers showing that anyone can and will make mistakes along the way lol :)
 
 <img src="images/blooper/booper1.gif" width="370"> <img src="images/blooper/haha.gif" width="380"> 
 
