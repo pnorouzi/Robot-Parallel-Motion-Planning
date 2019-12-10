@@ -270,6 +270,7 @@ Here are some bloopers showing that anyone can and will make mistakes along the 
 * [Milestone 1](files/CIS565_RPMP-milestone1.pdf)
 * [Milestone 2](files/CIS565_RPMP-milestone2.pdf)
 * [Milestone 3](files/CIS565_RPMP-milestone3.pdf)
+* [Final Presentation](files/CIS565_RPMP-finalPresentation.pdf)
 
 ## Credits/Sources:
 
